@@ -1,0 +1,10 @@
+build
+*.c
+*~
+__pycache__
+dist
+examples/kernels
+*.egg-info
+*.vtk
+.*
+examples/out

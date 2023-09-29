@@ -1,0 +1,18 @@
+\begindata
+
+   PATH_VALUES     = ( 'examples/kernels' )
+
+   PATH_SYMBOLS    = ( 'KERNELS_COMMON'   )
+
+   KERNELS_TO_LOAD = (
+                       '$KERNELS_COMMON/pck00010.tpc',
+                       '$KERNELS_COMMON/moon_080317.tf',
+                       '$KERNELS_COMMON/moon_assoc_pa.tf',
+                       '$KERNELS_COMMON/moon_pa_de421_1900_2050.bpc',
+                       '$KERNELS_COMMON/naif0012.tls',
+                       '$KERNELS_COMMON/de421.bsp',
+                     )
+
+\begintext
+
+
