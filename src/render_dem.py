@@ -1,11 +1,14 @@
 import os
 from datetime import datetime
+
 import numpy as np
 import pandas as pd
+import geopandas as gpd
 
 from src.import_mesh import import_mesh
+from src.mesh_util import crop_mesh
 from src.spice_util import get_sunvec
-from src.shape import CgalTrimeshShapeModel #, EmbreeTrimeshShapeModel
+from src.shape import CgalTrimeshShapeModel  # , EmbreeTrimeshShapeModel
 import xarray as xr
 from rasterio.enums import Resampling
 
@@ -14,7 +17,6 @@ from src.math_util import angle_btw
 
 
 def plot3d(mesh_path, var_to_plot, center='P'):
-
     import pyvista as pv
     if center == 'P':
         grid = pv.read(f"{mesh_path}")
@@ -55,9 +57,8 @@ def extended_sun(sun_vecs, extsun_coord):
     return sun_veccs + Vs * extsun_tiled[:, 0][:, np.newaxis] * Rs + Ws * extsun_tiled[:, 1][:, np.newaxis] * Rs
 
 
-def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, Fsun=1361., center='P', point=True):
-
-    F = shape_model.F
+def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, Fsun=1361.,
+                     center='P', point=True, basemesh=None):
     if center == 'V':
         C = shape_model.V
         N = shape_model.VN
@@ -79,9 +80,9 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, Fsun=1361.,
         sundir = sun_vecs / np.linalg.norm(sun_vecs, axis=1)[:, np.newaxis]
 
     if center == 'P':
-        E = shape_model.get_direct_irradiance(Fsun, sundir)
+        E = shape_model.get_direct_irradiance(Fsun, sundir, basemesh=basemesh)
     elif center == 'V':
-        E = shape_model.get_direct_irradiance_at_vertices(Fsun, sundir)
+        E = shape_model.get_direct_irradiance_at_vertices(Fsun, sundir, basemesh=basemesh)
 
     # # get Moon centered cartesian coordinates of the Sun at date and correct to hr faces centers
     faces_to_sun = point_sun_vecs - C
@@ -100,7 +101,7 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, Fsun=1361.,
     return E * albedo1 * photom1 * np.pi / Fsun
 
 
-def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None):
+def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_mask=None, basemesh_path=None):
     """
     Render terrain at epoch
     :param pdir:
@@ -110,6 +111,7 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None):
     :param outdir:
     :param center:
     :param crs:
+    :param dem_mask: GeoDataFrame, polygon of region to crop
     :return:
     """
 
@@ -119,15 +121,38 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None):
     format_code = '%Y %m %d %H:%M:%S'
     date_illum_spice = input_YYMMGGHHMMSS.strftime(format_code)
 
-    # import hr meshes and build shape_models
-    V_st, F_st, N_st, P_st = import_mesh(f"{meshes['stereo']}", get_normals=True, get_centroids=True)
-    V, F, N, P = import_mesh(f"{meshes['cart']}", get_normals=True, get_centroids=True)
+    # check if DEM needs to be cropped (e.g., to fit image)
+    if isinstance(dem_mask, gpd.GeoDataFrame):
+        print(f"- Cropping DEM to {dem_mask}")
+        meshes_cropped = {}
+        meshes_path = ('/').join(meshes['stereo'].split('/')[:-1])
+        meshes_cropped['stereo'] = f"{meshes_path}/cropped_st.ply"
+        meshes_cropped['cart'] = f"{meshes_path}/cropped.ply"
+
+        crop_mesh(dem_mask, meshes, mask=dem_mask, meshes_cropped=meshes_cropped)
+
+        V_st, F_st, N_st, P_st = import_mesh(f"{meshes_cropped['stereo']}", get_normals=True, get_centroids=True)
+        V, F, N, P = import_mesh(meshes_cropped['cart'], get_normals=True, get_centroids=True)
+    else:
+        # import hr meshes and build shape_models
+        V_st, F_st, N_st, P_st = import_mesh(f"{meshes['stereo']}", get_normals=True, get_centroids=True)
+        V, F, N, P = import_mesh(f"{meshes['cart']}", get_normals=True, get_centroids=True)
+        meshes_cropped = meshes
+
     shape_model = CgalTrimeshShapeModel(V, F, N)
 
-    # get flux at observer (would be good to just ask for F/V overlapping with meas image)
-    flux_at_obs = get_flux_at_date(shape_model, date_illum_spice, path_to_furnsh=path_to_furnsh, center=center)
+    if basemesh_path != None:
+        V_ds, F_ds, N_ds, P_ds = import_mesh(basemesh_path, get_normals=True, get_centroids=True)
+        basemesh = CgalTrimeshShapeModel(V_ds, F_ds, N_ds)
+    else:
+        basemesh = None
 
-    plot3d(mesh_path=f"{meshes['cart']}", var_to_plot=flux_at_obs)
+    # get flux at observer (would be good to just ask for F/V overlapping with meas image)
+    flux_at_obs = get_flux_at_date(shape_model, date_illum_spice, path_to_furnsh=path_to_furnsh,
+                                   center=center, basemesh=basemesh)
+
+    # plot3d(mesh_path=f"{meshes['cart']}", var_to_plot=flux_at_obs)
+    plot3d(mesh_path=meshes_cropped['stereo'], var_to_plot=flux_at_obs)
 
     # rasterize results from mesh
     # ---------------------------
@@ -141,7 +166,7 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None):
     flux_df = flux_df.set_index(['y', 'x'])
     ds = flux_df.to_xarray()
 
-    if crs!=None:
+    if crs != None:
         # assign crs
         img_crs = crs
         ds.rio.write_crs(img_crs, inplace=True)
@@ -152,6 +177,7 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None):
     dsi = ds.interpolate_na(dim="x").interpolate_na(dim="y")
 
     return dsi, date_illum_str
+
 
 def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc, meas_path, outdir=None, center='P'):
     """
@@ -175,33 +201,54 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc, meas_pat
 
     # interpolate to NAC nodes
     meas = xr.load_dataarray(meas_path)
-    meas = meas.where(meas > 0)
+    meas = meas.where(meas >= 0)
 
-    # cut down to useful (x, y) pairs instead of the whole "rectangle"
-    # x = np.linspace(np.min(V_st[:, 0]), np.max(V_st[:, 0]), 1000)
-    # y = np.linspace(np.min(V_st[:, 1]), np.max(V_st[:, 1]), 1000)
-    x = meas.x.values #*1.e-3
-    y = meas.y.values #*1.e-3
+    ############# simulate smaller image
+    # import shapely
+    # geometries = shapely.box(67400, 121800, 68400, 122200)
+    # meas = meas.rio.clip([geometries])
+    #############
+
+    # raster outer shape to polygon
+    ds = (meas.coarsen(x=100, boundary="trim").mean(skipna=True).
+          coarsen(y=100, boundary="trim").mean(skipna=True))
+    df = ds.to_dataframe().reset_index().loc[:, ['x', 'y']] * 1e-3
+    meas_outer_poly = gpd.GeoDataFrame(geometry=gpd.points_from_xy(df.x, df.y)).dissolve().convex_hull
+    meas_outer_poly = gpd.GeoDataFrame({'geometry': meas_outer_poly})
 
     # get full rendering at date
-    dsi, date_illum_str = render_at_date(meshes, epo_utc, path_to_furnsh, crs=meas.rio.crs)
+    dsi, date_illum_str = render_at_date(meshes, epo_utc, path_to_furnsh, crs=meas.rio.crs,
+                                         dem_mask=meas_outer_poly)  # , basemesh_path=meshes['cart'])
 
     # interp to measured image coordinates
-    rendering = dsi.interp(x=x, y=y)
-    rendering = rendering.rio.reproject_match(meas, Resampling=Resampling.bilinear,
-                                                                          nodata=np.nan).where(meas > 0)
+    rendering = dsi.rio.reproject_match(meas, Resampling=Resampling.bilinear,
+                                        nodata=np.nan)
 
     # apply "exposure factor" (median of ratio) to rendered image
-    exposure_factor = (rendering/meas).flux.values
-    rendering /= np.nanmedian(exposure_factor)
+    exposure_factor = rendering.flux.values / meas.sel({'band': 1}).values
+    exposure_factor = np.median(exposure_factor.ravel()[~np.isnan(exposure_factor.ravel())])
+
+    if exposure_factor > 0:
+        rendering /= exposure_factor
+    else:  # weird cases
+        max_ratio = rendering.max() / meas.sel({'band': 1}).max()
+        rendering /= max_ratio
+        print(f"# Exposure=={exposure_factor}: possible issue or mainly shadowed image (?). "
+              f"Normalizing with max_ratio={max_ratio.flux.values}.")
 
     # save simulated image to raster
     outraster = f"{outdir}{img_name}_{date_illum_str}.tif"
+    rendering.transpose('y', 'x').rio.to_raster(outraster)
+
+    #####
     # dsi.transpose('y', 'x').rio.to_raster(outraster) # full DEM region
-    rendering.sel({'band': 1}).transpose('y', 'x').rio.to_raster(outraster)
+    # rendering.flux.plot(robust=True)
+    # plt.show()
+    # meas.plot(robust=True)
+    # plt.show()
     # rendering.rio.to_raster(outraster)
+    #####
+
     print(f"- Flux for {img_name} saved to {outraster} (xy resolution = {rendering.rio.resolution()}mpp).")
 
     return outraster
-
-

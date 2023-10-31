@@ -1,14 +1,19 @@
+import meshio
 import numpy as np
+
+from src.import_mesh import import_mesh
 from src.shape import get_centroids
 
 
 def get_uniform_triangle_mesh(xgrid, ygrid, data, decimation=1):
-
-    dem = data[::decimation, ::decimation]
-    minshp = np.min(dem.shape)
-    dem = dem[:minshp, :minshp]
+    # Reduce input data to square set
+    minshp = np.min(data.shape)
+    data = data[:minshp, :minshp]
     xgrid = xgrid[:minshp]
     ygrid = ygrid[:minshp]
+
+    # decimate as requested
+    dem = data[::decimation, ::decimation]
 
     X_mesh, Y_mesh = np.meshgrid(xgrid[::decimation], ygrid[::decimation])
     points_mesh = np.array([X_mesh.flatten(), Y_mesh.flatten()]).T
@@ -111,3 +116,34 @@ def vertex_faces(vertices, triangles):
         result[i, :len(arr)] = arr
 
     return result
+
+
+def crop_mesh(polysgdf, meshes, mask, meshes_cropped):
+    import geopandas as gpd
+    import shapely
+
+    if not isinstance(polysgdf, gpd.GeoDataFrame):
+        print("* mask should be a GeoDataFrame")
+        exit()
+
+    V_st, F_st, N_st, P_st = import_mesh(f"{meshes['stereo']}", get_normals=True, get_centroids=True)
+    V, F, N, P = import_mesh(f"{meshes['cart']}", get_normals=True, get_centroids=True)
+
+    pointsDF = gpd.GeoDataFrame(geometry=shapely.points(V_st[:, 0], V_st[:, 1]))
+    joinDF = pointsDF.sjoin(mask, how='left', op="within")
+    # crop V
+    Vcropped_st = V_st[joinDF.dropna(axis=0).index].astype(float)
+    Vcropped = V[joinDF.dropna(axis=0).index].astype(float)
+
+    # covert F idx to new Vcropped
+    Vdict = {vold: idx for idx, vold in enumerate(joinDF.dropna(axis=0).index.to_list())}
+    Fcropped = np.reshape([*map(Vdict.get, F.ravel())], (-1, 3))
+    Fcropped = Fcropped[~np.isnan(Fcropped.astype(float)).any(axis=1)].astype(int)
+
+    # save cropped mesh to file
+    mesh = meshio.Mesh(Vcropped_st, [('triangle', Fcropped)])
+    mesh.write(f"{meshes_cropped['stereo']}")
+    mesh = meshio.Mesh(Vcropped, [('triangle', Fcropped)])
+    mesh.write(f"{meshes_cropped['cart']}")
+
+    return {'V': Vcropped, 'V_st': Vcropped_st, 'F': Fcropped}
