@@ -17,6 +17,7 @@ from src.math_util import angle_btw
 
 
 def plot3d(mesh_path, var_to_plot, center='P'):
+
     import pyvista as pv
     if center == 'P':
         grid = pv.read(f"{mesh_path}")
@@ -101,7 +102,7 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, Fsun=1361.,
     return E * albedo1 * photom1 * np.pi / Fsun
 
 
-def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_mask=None, basemesh_path=None):
+def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_mask=None, basemesh_path=None, show=False):
     """
     Render terrain at epoch
     :param pdir:
@@ -151,8 +152,9 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
     flux_at_obs = get_flux_at_date(shape_model, date_illum_spice, path_to_furnsh=path_to_furnsh,
                                    center=center, basemesh=basemesh)
 
-    # plot3d(mesh_path=f"{meshes['cart']}", var_to_plot=flux_at_obs)
-    plot3d(mesh_path=meshes_cropped['stereo'], var_to_plot=flux_at_obs)
+    if show:
+        # plot3d(mesh_path=f"{meshes['cart']}", var_to_plot=flux_at_obs)
+        plot3d(mesh_path=meshes_cropped['stereo'], var_to_plot=flux_at_obs)
 
     # rasterize results from mesh
     # ---------------------------
@@ -176,10 +178,10 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
     ds['y'] = ds.y * 1e3
     dsi = ds.interpolate_na(dim="x").interpolate_na(dim="y")
 
-    return dsi, date_illum_str
+    return dsi, epo_utc
 
 
-def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc, meas_path, outdir=None, center='P'):
+def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc, meas_path, outdir=None):
     """
     Render input terrain at epoch and match observed flux to input image
     :param pdir:

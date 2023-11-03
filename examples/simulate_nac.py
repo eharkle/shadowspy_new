@@ -14,7 +14,7 @@ if __name__ == '__main__':
     # compute direct flux from the Sun
     Fsun = 1361  # W/m2
     Rb = 1737.4 # km
-    base_resolution = 20
+    base_resolution = 2
     root = "examples/"
     os.makedirs(root, exist_ok=True)
 
@@ -23,7 +23,7 @@ if __name__ == '__main__':
 
     # Elevation/DEM GTiff input
     indir = f"{root}aux/"
-    tif_path = f'{indir}ldem_6.tif'#
+    tif_path = f'{indir}ldem_0.tif'#
     meshpath = tif_path.split('.')[0]
 
     # prepare mesh of the input dem
