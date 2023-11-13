@@ -117,8 +117,6 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
     """
 
     input_YYMMGGHHMMSS = datetime.strptime(epo_utc.strip(), '%Y-%m-%d %H:%M:%S.%f')
-    format_code = '%Y%m%d%H%M%S'
-    date_illum_str = input_YYMMGGHHMMSS.strftime(format_code)
     format_code = '%Y %m %d %H:%M:%S'
     date_illum_spice = input_YYMMGGHHMMSS.strftime(format_code)
 

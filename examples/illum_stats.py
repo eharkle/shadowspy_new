@@ -1,4 +1,5 @@
 import glob
+import logging
 import os
 import shutil
 import time
@@ -15,11 +16,12 @@ from src.render_dem import render_at_date
 if __name__ == '__main__':
 
     # DM2, S01, Haworth close to ray, De Gerlache S11, Malapert
+    siteid = 'DM2'
 
     # compute direct flux from the Sun
     Fsun = 1361  # W/m2
     Rb = 1737.4  # km
-    base_resolution = 5
+    base_resolution = 20
     root = "examples/"
     os.makedirs(root, exist_ok=True)
 
@@ -29,6 +31,7 @@ if __name__ == '__main__':
     # Elevation/DEM GTiff input
     indir = f"{root}aux/"
     tif_path = f'{indir}ldem_6_cut.tif'  #
+    outdir = f"{root}out/"
     meshpath = tif_path.split('.')[0]
 
     # prepare mesh of the input dem
@@ -50,7 +53,7 @@ if __name__ == '__main__':
     # epos_utc = ['2023-09-29 06:00:00.0']
     start_time = datetime.date(2023, 9, 1)
     end_time = datetime.date(2023, 9, 30)
-    s = pd.Series(pd.date_range(start_time, end_time, freq='6H')
+    s = pd.Series(pd.date_range(start_time, end_time, freq='24H')
                   .strftime('%Y-%m-%d %H:%M:%S.%f'))
     epos_utc = s.values.tolist()
     print(f"- Rendering input DEM at {epos_utc}.")
@@ -70,20 +73,41 @@ if __name__ == '__main__':
 
     # stack dataarrays in list
     ds = xr.combine_by_coords(list_da)
+    moon_sp_crs = xr.open_dataset(tif_path).rio.crs
+    ds.rio.write_crs(moon_sp_crs, inplace=True)
     print(ds)
 
-    fig, axes = plt.subplots(1, 3, figsize=(26, 6))
     # get cumulative flux
-    ds.sum(dim='time').flux.plot(ax=axes[0])
-    axes[0].set_title('Sum')
-
+    dssum = ds.sum(dim='time')
     # get max flux
-    ds.max(dim='time').flux.plot(ax=axes[1])
-    axes[1].set_title('Max')
-
+    dsmax = ds.max(dim='time')
     # get average flux
-    ds.mean(dim='time').flux.plot(ax=axes[2])
-    axes[2].set_title('Mean')
+    dsmean = ds.mean(dim='time')
 
+    # save to raster
+    format_code = '%Y%m%d%H%M%S'
+    start_time = start_time.strftime(format_code)
+    end_time = end_time.strftime(format_code)
+
+    sumout = f"{outdir}{siteid}_sum_{start_time}_{end_time}.tif"
+    dssum.flux.rio.to_raster(sumout)
+    logging.info(f"- Cumulative flux over {list(dsi_list.keys())[0]} to {list(dsi_list.keys())[-1]} saved to {sumout}.")
+
+    maxout = f"{outdir}{siteid}_max_{start_time}_{end_time}.tif"
+    dsmax.flux.rio.to_raster(maxout)
+    logging.info(f"- Maximum flux over {list(dsi_list.keys())[0]} to {list(dsi_list.keys())[-1]} saved to {maxout}.")
+
+    meanout = f"{outdir}{siteid}_mean_{start_time}_{end_time}.tif"
+    dsmean.flux.rio.to_raster(meanout)
+    logging.info(f"- Average flux over {list(dsi_list.keys())[0]} to {list(dsi_list.keys())[-1]} saved to {meanout}.")
+
+    # plot statistics
+    fig, axes = plt.subplots(1, 3, figsize=(26, 6))
+    dssum.flux.plot(ax=axes[0], robust=True)
+    axes[0].set_title('Sum')
+    dsmax.flux.plot(ax=axes[1], robust=True)
+    axes[1].set_title('Max')
+    dsmean.flux.plot(ax=axes[2], robust=True)
+    axes[2].set_title('Mean')
     plt.suptitle(f'Statistics of solar flux between {start_time} and {end_time}.')
     plt.show()
