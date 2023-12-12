@@ -9,6 +9,7 @@ contourpy==1.1.1
 cycler==0.12.0
 Cython==3.0.2
 fonttools==4.43.0
+geopandas
 idna==3.4
 importlib-resources==6.1.0
 kiwisolver==1.4.5
@@ -38,6 +39,7 @@ scooby==0.7.3
 six==1.16.0
 snuggs==1.4.7
 spiceypy==6.0.0
+tqdm
 tzdata==2023.3
 urllib3==2.0.5
 vtk==9.2.6

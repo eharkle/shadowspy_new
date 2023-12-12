@@ -16,12 +16,12 @@ from src.render_dem import render_at_date
 if __name__ == '__main__':
 
     # DM2, S01, Haworth close to ray, De Gerlache S11, Malapert
-    siteid = 'DM2'
+    siteid = 'Site23' # 'DM2'
 
     # compute direct flux from the Sun
     Fsun = 1361  # W/m2
     Rb = 1737.4  # km
-    base_resolution = 20
+    base_resolution = 5
     root = "examples/"
     os.makedirs(root, exist_ok=True)
 
@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
     # Elevation/DEM GTiff input
     indir = f"{root}aux/"
-    tif_path = f'{indir}ldem_6_cut.tif'  #
+    tif_path = f'{indir}{siteid}_final_adj_5mpp_surf.tif'  #
     outdir = f"{root}out/"
     meshpath = tif_path.split('.')[0]
 
@@ -88,7 +88,8 @@ if __name__ == '__main__':
     format_code = '%Y%m%d%H%M%S'
     start_time = start_time.strftime(format_code)
     end_time = end_time.strftime(format_code)
-
+    os.makedirs(outdir, exist_ok=True)
+    
     sumout = f"{outdir}{siteid}_sum_{start_time}_{end_time}.tif"
     dssum.flux.rio.to_raster(sumout)
     logging.info(f"- Cumulative flux over {list(dsi_list.keys())[0]} to {list(dsi_list.keys())[-1]} saved to {sumout}.")
