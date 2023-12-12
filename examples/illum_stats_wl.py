@@ -2,6 +2,7 @@ import glob
 import logging
 import os
 import shutil
+import sys
 import time
 import pandas as pd
 import datetime
@@ -17,10 +18,10 @@ from src.flux_util import get_Fsun
 if __name__ == '__main__':
 
     # DM2, S01, Haworth close to ray, De Gerlache S11, Malapert
-    siteid = 'DM2'
+    siteid = sys.argv[1]
 
     Rb = 1737.4  # km
-    base_resolution = 20
+    base_resolution = 5
     root = "examples/"
     os.makedirs(root, exist_ok=True)
 
@@ -31,14 +32,9 @@ if __name__ == '__main__':
     indir = f"{root}aux/"
     outdir = f"{root}out/"
     # tif_path = f'{indir}ldem_6_cut.tif'  #
-    tif_path = f"/home/sberton2/Lavoro/projects/HabNiches/dems/{siteid}_final_adj_5mpp_surf.tif"
+    tif_path = f'{indir}{siteid}_final_adj_5mpp_surf.tif'  #
     flux_path = f"{indir}ssi_v02r01_yearly_s1610_e2022_c20230120.nc"
     meshpath = tif_path.split('.')[0]
-
-
-    # compute direct flux from the Sun
-    # use < 320 nm
-    # Fsun = 1361  # W/m2
 
     # prepare mesh of the input dem
     start = time.time()
@@ -69,7 +65,8 @@ if __name__ == '__main__':
         # retrieve UV flux
         flux_epo, Fsun = get_Fsun(flux_path, epo_in, wavelength=[115, 320])
         dsi, epo_out = render_at_date(meshes={'stereo': f"{meshpath}_st{ext}", 'cart': f"{meshpath}{ext}"},
-                                      path_to_furnsh=f"{indir}simple.furnsh", epo_utc=epo_in, Fsun=Fsun)
+                                      path_to_furnsh=f"{indir}simple.furnsh", epo_utc=epo_in, Fsun=Fsun,
+                                      show=True)
         dsi_list[epo_out] = dsi
 
     list_da = []

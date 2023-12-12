@@ -89,7 +89,7 @@ if __name__ == '__main__':
     start_time = start_time.strftime(format_code)
     end_time = end_time.strftime(format_code)
     os.makedirs(outdir, exist_ok=True)
-    
+
     sumout = f"{outdir}{siteid}_sum_{start_time}_{end_time}.tif"
     dssum.flux.rio.to_raster(sumout)
     logging.info(f"- Cumulative flux over {list(dsi_list.keys())[0]} to {list(dsi_list.keys())[-1]} saved to {sumout}.")
@@ -112,3 +112,4 @@ if __name__ == '__main__':
     axes[2].set_title('Mean')
     plt.suptitle(f'Statistics of solar flux between {start_time} and {end_time}.')
     plt.show()
+
