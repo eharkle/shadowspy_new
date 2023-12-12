@@ -102,7 +102,8 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, Fsun=1361.,
     return E * albedo1 * photom1 * np.pi / Fsun
 
 
-def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_mask=None, basemesh_path=None, show=False):
+def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_mask=None,
+                   Fsun=1361, basemesh_path=None, show=False):
     """
     Render terrain at epoch
     :param pdir:
@@ -148,7 +149,7 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
 
     # get flux at observer (would be good to just ask for F/V overlapping with meas image)
     flux_at_obs = get_flux_at_date(shape_model, date_illum_spice, path_to_furnsh=path_to_furnsh,
-                                   center=center, basemesh=basemesh)
+                                   center=center, basemesh=basemesh, Fsun=Fsun)
 
     if show:
         # plot3d(mesh_path=f"{meshes['cart']}", var_to_plot=flux_at_obs)

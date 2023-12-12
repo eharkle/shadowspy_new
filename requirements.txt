@@ -16,6 +16,7 @@ markdown-it-py==3.0.0
 matplotlib==3.8.0
 mdurl==0.1.2
 meshio==5.3.4
+netCDF4
 numpy==1.26.0
 packaging==23.1
 pandas==2.1.1
