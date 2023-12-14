@@ -1,7 +1,28 @@
+import pandas as pd
 import xarray as xr
 # import datetime
+import numpy as np
+
 
 def get_Fsun(filin, epoch, wavelength=None,  ):
+
+    df = pd.read_csv(filin, sep='\s+', comment=';', skiprows=142, header=None)
+    df.columns = ["Wavelength (nm)",  "Irradiance Mar 25-29",  "Irradiance Mar 30-Apr 4",
+                  "Irradiance Apr 10-16", "Data Source"]
+
+    df = df.loc[:, ["Wavelength (nm)", "Irradiance Apr 10-16"]]
+    df = df.set_index('Wavelength (nm)')
+
+    step = np.nanmean(df.index.diff()).round(2)
+
+    if isinstance(wavelength, list):
+        df = df.loc[wavelength[0]: wavelength[-1]]
+    else:
+        df = df.loc[wavelength-step: wavelength+step]
+
+    return (df*step).sum().values
+
+def get_Fsun2(filin, epoch, wavelength=None,  ):
 
     ds = xr.open_dataset(filin)
     # avoid issue with pre-1670 epochs

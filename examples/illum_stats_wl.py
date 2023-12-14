@@ -21,7 +21,7 @@ if __name__ == '__main__':
     siteid = sys.argv[1]
 
     Rb = 1737.4  # km
-    base_resolution = 5
+    base_resolution = 20
     root = "examples/"
     os.makedirs(root, exist_ok=True)
 
@@ -32,8 +32,10 @@ if __name__ == '__main__':
     indir = f"{root}aux/"
     outdir = f"{root}out/"
     # tif_path = f'{indir}ldem_6_cut.tif'  #
-    tif_path = f'{indir}{siteid}_final_adj_5mpp_surf.tif'  #
-    flux_path = f"{indir}ssi_v02r01_yearly_s1610_e2022_c20230120.nc"
+    #tif_path = f'{indir}{siteid}_final_adj_5mpp_surf.tif'  #
+    tif_path = f"/home/sberton2/Lavoro/projects/HabNiches/dems/{siteid}_final_adj_5mpp_surf.tif"
+    # flux_path = f"{indir}ssi_v02r01_yearly_s1610_e2022_c20230120.nc" (only covers >115 nm)
+    flux_path = f"{indir}ref_solar_irradiance_whi-2008_ver2.dat"
     meshpath = tif_path.split('.')[0]
 
     # prepare mesh of the input dem
@@ -63,7 +65,7 @@ if __name__ == '__main__':
     dsi_list = {}
     for epo_in in tqdm(epos_utc):
         # retrieve UV flux
-        flux_epo, Fsun = get_Fsun(flux_path, epo_in, wavelength=[115, 320])
+        Fsun = get_Fsun(flux_path, epo_in, wavelength=[0, 320])
         dsi, epo_out = render_at_date(meshes={'stereo': f"{meshpath}_st{ext}", 'cart': f"{meshpath}{ext}"},
                                       path_to_furnsh=f"{indir}simple.furnsh", epo_utc=epo_in, Fsun=Fsun,
                                       show=True)
@@ -82,8 +84,9 @@ if __name__ == '__main__':
     ds.rio.write_crs(moon_sp_crs, inplace=True)
     print(ds)
 
-    # get cumulative flux
-    dssum = ds.sum(dim='time')
+    # get cumulative flux (assuming 24H steps for now)
+    step = 24. * 86400.
+    dssum = (ds * step).sum(dim='time')
     # get max flux
     dsmax = ds.max(dim='time')
     # get average flux
