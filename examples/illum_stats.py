@@ -78,7 +78,8 @@ if __name__ == '__main__':
     print(ds)
 
     # get cumulative flux
-    dssum = ds.sum(dim='time')
+    step = 24. * 86400.
+    dssum = (ds * step).sum(dim='time')
     # get max flux
     dsmax = ds.max(dim='time')
     # get average flux
