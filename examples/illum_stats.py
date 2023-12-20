@@ -112,5 +112,8 @@ if __name__ == '__main__':
     dsmean.flux.plot(ax=axes[2], robust=True)
     axes[2].set_title(r'Mean (W/m$^2$)')
     plt.suptitle(f'Statistics of solar flux at {siteid} between {start_time} and {end_time}.')
-    plt.show()
+    pngout = f"{outdir}{siteid}_stats_{start_time}_{end_time}.png"
+    plt.savefig(pngout)
+    # plt.show()
+
 
