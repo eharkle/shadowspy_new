@@ -1,9 +1,11 @@
+import logging
 import os
 from datetime import datetime
 
 import numpy as np
 import pandas as pd
 import geopandas as gpd
+from matplotlib import pyplot as plt
 
 from src.import_mesh import import_mesh
 from src.mesh_util import crop_mesh
@@ -59,7 +61,7 @@ def extended_sun(sun_vecs, extsun_coord):
 
 
 def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, Fsun=1361.,
-                     center='P', point=True, basemesh=None):
+                     center='P', point=True, basemesh=None, return_irradiance=False):
     if center == 'V':
         C = shape_model.V
         N = shape_model.VN
@@ -85,6 +87,9 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, Fsun=1361.,
     elif center == 'V':
         E = shape_model.get_direct_irradiance_at_vertices(Fsun, sundir, basemesh=basemesh)
 
+    if return_irradiance:
+        return E
+
     # # get Moon centered cartesian coordinates of the Sun at date and correct to hr faces centers
     faces_to_sun = point_sun_vecs - C
 
@@ -103,7 +108,7 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, Fsun=1361.,
 
 
 def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_mask=None,
-                   Fsun=1361, basemesh_path=None, show=False):
+                   Fsun=1361, basemesh_path=None, show=False, point=True, return_irradiance=False):
     """
     Render terrain at epoch
     :param pdir:
@@ -149,7 +154,8 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
 
     # get flux at observer (would be good to just ask for F/V overlapping with meas image)
     flux_at_obs = get_flux_at_date(shape_model, date_illum_spice, path_to_furnsh=path_to_furnsh,
-                                   center=center, basemesh=basemesh, Fsun=Fsun)
+                                   center=center, basemesh=basemesh, Fsun=Fsun, point=point,
+                                   return_irradiance=return_irradiance)
 
     if show:
         # plot3d(mesh_path=f"{meshes['cart']}", var_to_plot=flux_at_obs)
@@ -180,7 +186,34 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
     return dsi, epo_utc
 
 
-def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc, meas_path, outdir=None):
+def irradiance_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_mask=None,
+                       Fsun=1361, basemesh_path=None, show=False, point=True, return_irradiance=True):
+    """
+    Get terrain irradiance at epoch
+    :param Fsun:
+    :param basemesh_path:
+    :param show:
+    :param point:
+    :param pdir:
+    :param meshes: dict
+    :param path_to_furnsh:
+    :param epo_utc:
+    :param outdir:
+    :param center: str, can take values P or V
+    :param crs: str
+    :param dem_mask: GeoDataFrame, polygon of region to crop
+    :param return_irradiance: bool, must be True
+    :return:
+    """
+    if not return_irradiance:
+        logging.error("* Either set return_irradiance=True, or else call render_at_date.")
+
+    return render_at_date(meshes, epo_utc, path_to_furnsh, center, crs, dem_mask,
+                   Fsun, basemesh_path, show, point, return_irradiance)
+
+
+def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
+                       meas_path, outdir=None, center='P', basemesh=None, point=True):
     """
     Render input terrain at epoch and match observed flux to input image
     :param pdir:
@@ -211,15 +244,18 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc, meas_pat
     #############
 
     # raster outer shape to polygon
-    ds = (meas.coarsen(x=100, boundary="trim").mean(skipna=True).
-          coarsen(y=100, boundary="trim").mean(skipna=True))
+    ds = (meas.coarsen(x=1, boundary="trim").mean(skipna=True).
+          coarsen(y=1, boundary="trim").mean(skipna=True))
     df = ds.to_dataframe().reset_index().loc[:, ['x', 'y']] * 1e-3
-    meas_outer_poly = gpd.GeoDataFrame(geometry=gpd.points_from_xy(df.x, df.y)).dissolve().convex_hull
-    meas_outer_poly = gpd.GeoDataFrame({'geometry': meas_outer_poly})
+    meas_outer_poly = gpd.GeoDataFrame(geometry=gpd.points_from_xy(df.x, df.y))
+    meas_outer_poly = meas_outer_poly.dropna(axis=0).dissolve().convex_hull
+    meas_outer_poly = gpd.GeoDataFrame({'geometry': meas_outer_poly.buffer(50, join_style=2)})
 
     # get full rendering at date
     dsi, date_illum_str = render_at_date(meshes, epo_utc, path_to_furnsh, crs=meas.rio.crs,
-                                         dem_mask=meas_outer_poly)  # , basemesh_path=meshes['cart'])
+                                         dem_mask=meas_outer_poly, center=center,
+                                         basemesh_path=basemesh, point=point
+                                         )
 
     # interp to measured image coordinates
     rendering = dsi.rio.reproject_match(meas, Resampling=Resampling.bilinear,
@@ -242,11 +278,11 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc, meas_pat
     rendering.transpose('y', 'x').rio.to_raster(outraster)
 
     #####
-    # dsi.transpose('y', 'x').rio.to_raster(outraster) # full DEM region
-    # rendering.flux.plot(robust=True)
-    # plt.show()
-    # meas.plot(robust=True)
-    # plt.show()
+    dsi.transpose('y', 'x').rio.to_raster(outraster) # full DEM region
+    rendering.flux.plot(robust=True)
+    plt.show()
+    meas.plot(robust=True)
+    plt.show()
     # rendering.rio.to_raster(outraster)
     #####
 

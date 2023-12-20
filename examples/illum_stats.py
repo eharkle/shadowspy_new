@@ -11,7 +11,7 @@ from matplotlib import pyplot as plt
 
 from examples.download_kernels import download_kernels
 from src import prepare_meshes
-from src.render_dem import render_at_date
+from src.render_dem import render_at_date, irradiance_at_date
 
 if __name__ == '__main__':
 
@@ -52,7 +52,7 @@ if __name__ == '__main__':
     # get list of images from mapprojected folder
     # epos_utc = ['2023-09-29 06:00:00.0']
     start_time = datetime.date(2023, 9, 1)
-    end_time = datetime.date(2023, 9, 30)
+    end_time = datetime.date(2023, 9, 29)
     s = pd.Series(pd.date_range(start_time, end_time, freq='24H')
                   .strftime('%Y-%m-%d %H:%M:%S.%f'))
     epos_utc = s.values.tolist()
@@ -60,8 +60,8 @@ if __name__ == '__main__':
 
     dsi_list = {}
     for epo_in in tqdm(epos_utc):
-        dsi, epo_out = render_at_date(meshes={'stereo': f"{meshpath}_st{ext}", 'cart': f"{meshpath}{ext}"},
-                                      path_to_furnsh=f"{indir}simple.furnsh", epo_utc=epo_in)
+        dsi, epo_out = irradiance_at_date(meshes={'stereo': f"{meshpath}_st{ext}", 'cart': f"{meshpath}{ext}"},
+                                            path_to_furnsh=f"{indir}simple.furnsh", epo_utc=epo_in)
         dsi_list[epo_out] = dsi
 
     list_da = []
@@ -78,7 +78,7 @@ if __name__ == '__main__':
     print(ds)
 
     # get cumulative flux
-    step = 24. * 86400.
+    step = 24. * 3600.
     dssum = (ds * step).sum(dim='time')
     # get max flux
     dsmax = ds.max(dim='time')
@@ -106,11 +106,11 @@ if __name__ == '__main__':
     # plot statistics
     fig, axes = plt.subplots(1, 3, figsize=(26, 6))
     dssum.flux.plot(ax=axes[0], robust=True)
-    axes[0].set_title('Sum')
+    axes[0].set_title(r'Sum (J/m$^2$)')
     dsmax.flux.plot(ax=axes[1], robust=True)
-    axes[1].set_title('Max')
+    axes[1].set_title(r'Max (W/m$^2$)')
     dsmean.flux.plot(ax=axes[2], robust=True)
-    axes[2].set_title('Mean')
-    plt.suptitle(f'Statistics of solar flux between {start_time} and {end_time}.')
+    axes[2].set_title(r'Mean (W/m$^2$)')
+    plt.suptitle(f'Statistics of solar flux at {siteid} between {start_time} and {end_time}.')
     plt.show()
 
