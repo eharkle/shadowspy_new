@@ -72,6 +72,8 @@ if __name__ == '__main__':
         dsi = dsi.assign_coords(time=epo_in)
         dsi = dsi.expand_dims(dim="time")
         dsi.flux.rio.to_raster(f"{outdir}{siteid}/{siteid}_{idx}.tif")
+        dsi.flux.plot(clim=[0, 350])
+        plt.savefig(f'{outdir}{siteid}_illum_{epo_in}_{idx}.png')
 
     # load and stack dataarrays from list
     list_da = []
