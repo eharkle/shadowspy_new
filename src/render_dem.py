@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 
 from src.import_mesh import import_mesh
 from src.mesh_util import crop_mesh
-from src.spice_util import get_sunvec
+from src.spice_util import get_sourcevec
 from src.shape import CgalTrimeshShapeModel  # , EmbreeTrimeshShapeModel
 import xarray as xr
 from rasterio.enums import Resampling
@@ -60,8 +60,8 @@ def extended_sun(sun_vecs, extsun_coord):
     return sun_veccs + Vs * extsun_tiled[:, 0][:, np.newaxis] * Rs + Ws * extsun_tiled[:, 1][:, np.newaxis] * Rs
 
 
-def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, Fsun=1361.,
-                     center='P', point=True, basemesh=None, return_irradiance=False):
+def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN', inc_flux=1361., center='P',
+                     point=True, basemesh=None, return_irradiance=False):
     if center == 'V':
         C = shape_model.V
         N = shape_model.VN
@@ -69,29 +69,37 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, Fsun=1361.,
         C = shape_model.P
         N = shape_model.N
 
-    point_sun_vecs = get_sunvec(utc0=utc0, stepet=1, et_linspace=np.linspace(0, 1, 1),
-                                path_to_furnsh=path_to_furnsh,
-                                target='SUN', frame='MOON_ME', observer='MOON')
+    point_source_vecs = get_sourcevec(utc0=utc0, stepet=1, et_linspace=np.linspace(0, 1, 1),
+                                   path_to_furnsh=path_to_furnsh,
+                                   target=source, frame='MOON_ME', observer='MOON')
 
     if point:
         # if point Sun
-        sun_vecs = point_sun_vecs
-        sundir = sun_vecs / np.linalg.norm(sun_vecs)
+        source_vecs = point_source_vecs
+        sourcedir = source_vecs / np.linalg.norm(source_vecs)
     else:
-        sun_vecs = extended_sun(point_sun_vecs,
+        if source == 'SUN':
+            source_vecs = extended_sun(point_source_vecs,
                                 extsun_coord=f"examples/aux/coordflux_100pts_outline33_centerlast_R1_F1_stdlimbdark.txt")
-        sundir = sun_vecs / np.linalg.norm(sun_vecs, axis=1)[:, np.newaxis]
+        elif source == 'EARTH':
+            source_vecs = extended_sun(point_source_vecs,
+                                extsun_coord=f"examples/aux/Source2D_Earth_100pts_centerlast.inc")
+        else:
+            logging.error(f"* Only SUN and EARTH set as possible light-sources. User asked for {source}. Exit.")
+            exit()
+
+        sourcedir = source_vecs / np.linalg.norm(source_vecs, axis=1)[:, np.newaxis]
 
     if center == 'P':
-        E = shape_model.get_direct_irradiance(Fsun, sundir, basemesh=basemesh)
+        E = shape_model.get_direct_irradiance(inc_flux, sourcedir, basemesh=basemesh)
     elif center == 'V':
-        E = shape_model.get_direct_irradiance_at_vertices(Fsun, sundir, basemesh=basemesh)
+        E = shape_model.get_direct_irradiance_at_vertices(inc_flux, sourcedir, basemesh=basemesh)
 
     if return_irradiance:
         return E
 
     # # get Moon centered cartesian coordinates of the Sun at date and correct to hr faces centers
-    faces_to_sun = point_sun_vecs - C
+    faces_to_sun = point_source_vecs - C
 
     # compute incidence angles for visible faces (redundant, many faces are the same, but shouldn't be an issue)
     incidence_angle1 = angle_btw(faces_to_sun, N)
@@ -104,11 +112,11 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, Fsun=1361.,
     photom1 = mmpf_mh_boyd2017lpsc(phase=phase_angle1, emission=emission_angle1, incidence=incidence_angle1)
 
     # # compute radiance out of scatterer
-    return E * albedo1 * photom1 * np.pi / Fsun
+    return E * albedo1 * photom1 * np.pi / inc_flux
 
 
-def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_mask=None,
-                   Fsun=1361, basemesh_path=None, show=False, point=True, return_irradiance=False):
+def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_mask=None, source='SUN',
+                   inc_flux=1361, basemesh_path=None, show=False, point=True, return_irradiance=False):
     """
     Render terrain at epoch
     :param pdir:
@@ -154,8 +162,8 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
 
     # get flux at observer (would be good to just ask for F/V overlapping with meas image)
     flux_at_obs = get_flux_at_date(shape_model, date_illum_spice, path_to_furnsh=path_to_furnsh,
-                                   center=center, basemesh=basemesh, Fsun=Fsun, point=point,
-                                   return_irradiance=return_irradiance)
+                                   source=source, inc_flux=inc_flux,
+                                   center=center, point=point, basemesh=basemesh, return_irradiance=return_irradiance)
 
     if show:
         # plot3d(mesh_path=f"{meshes['cart']}", var_to_plot=flux_at_obs)
@@ -186,11 +194,11 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
     return dsi, epo_utc
 
 
-def irradiance_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_mask=None,
-                       Fsun=1361, basemesh_path=None, show=False, point=True, return_irradiance=True):
+def irradiance_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_mask=None, source='SUN',
+                       inc_flux=1361, basemesh_path=None, show=False, point=True, return_irradiance=True):
     """
     Get terrain irradiance at epoch
-    :param Fsun:
+    :param inc_flux:
     :param basemesh_path:
     :param show:
     :param point:
@@ -208,8 +216,8 @@ def irradiance_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, de
     if not return_irradiance:
         logging.error("* Either set return_irradiance=True, or else call render_at_date.")
 
-    return render_at_date(meshes, epo_utc, path_to_furnsh, center, crs, dem_mask,
-                   Fsun, basemesh_path, show, point, return_irradiance)
+    return render_at_date(meshes, epo_utc, path_to_furnsh, center, crs, dem_mask,source,
+                          inc_flux, basemesh_path, show, point, return_irradiance)
 
 
 def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,

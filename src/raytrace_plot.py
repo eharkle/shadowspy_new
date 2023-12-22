@@ -11,7 +11,7 @@ import colorcet as cc
 
 from shape import CgalTrimeshShapeModel
 from import_mesh import import_mesh
-from spice_util import get_sunvec
+from spice_util import get_sourcevec
 
 
 def get_values_using_raytracing(field, xgrid, ygrid, shape_model_st):
@@ -161,8 +161,8 @@ if __name__ == '__main__':
     format_code = '%Y %m %d %H:%M:%S'
     date_illum_spice = input_YYMMGGHHMMSS.strftime(format_code)
     utc0 = date_illum_spice
-    sun_vecs = get_sunvec(utc0=utc0, stepet=1, et_linspace=np.linspace(0, 1, 1), path_to_furnsh='aux/simple.furnsh',
-                          target='SUN', frame='MOON_ME', observer='MOON')
+    sun_vecs = get_sourcevec(utc0=utc0, stepet=1, et_linspace=np.linspace(0, 1, 1), path_to_furnsh='aux/simple.furnsh',
+                             target='SUN', frame='MOON_ME', observer='MOON')
     E = shape_model.get_direct_irradiance(Fsun, sun_vecs)
 
     E_grid = get_values_using_raytracing(E, x, y[-1:0:-1], shape_model_st).T

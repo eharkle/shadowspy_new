@@ -1,4 +1,4 @@
-def get_sunvec(utc0, target, observer, frame, utc1=0, stepet=1, et_linspace=None, path_to_furnsh='aux/simple.furnsh'):
+def get_sourcevec(utc0, target, observer, frame, utc1=0, stepet=1, et_linspace=None, path_to_furnsh='aux/simple.furnsh'):
     '''This script uses SPICE to compute a trajectory for the sun, loads a
         shape model discretizing a patch of the lunar south pole (made using
         lsp_make_obj.py), and a compressed form factor matrix for that

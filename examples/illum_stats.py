@@ -1,4 +1,5 @@
 import glob
+import json
 import logging
 import os
 import shutil
@@ -14,6 +15,8 @@ from src import prepare_meshes
 from src.render_dem import render_at_date, irradiance_at_date
 
 if __name__ == '__main__':
+
+    start = time.time()
 
     # DM2, S01, Haworth close to ray, De Gerlache S11, Malapert
     siteid = 'Site23' # 'DM2'
@@ -53,22 +56,31 @@ if __name__ == '__main__':
     # epos_utc = ['2023-09-29 06:00:00.0']
     start_time = datetime.date(2023, 9, 1)
     end_time = datetime.date(2023, 9, 29)
-    s = pd.Series(pd.date_range(start_time, end_time, freq='24H')
+    time_step_hours = 24
+    s = pd.Series(pd.date_range(start_time, end_time, freq=f'{time_step_hours}H')
                   .strftime('%Y-%m-%d %H:%M:%S.%f'))
     epos_utc = s.values.tolist()
     print(f"- Rendering input DEM at {epos_utc}.")
 
     dsi_list = {}
-    for epo_in in tqdm(epos_utc):
+    for idx, epo_in in tqdm(enumerate(epos_utc)):
         dsi, epo_out = irradiance_at_date(meshes={'stereo': f"{meshpath}_st{ext}", 'cart': f"{meshpath}{ext}"},
-                                            path_to_furnsh=f"{indir}simple.furnsh", epo_utc=epo_in)
-        dsi_list[epo_out] = dsi
+                                            path_to_furnsh=f"{indir}simple.furnsh", epo_utc=epo_in,
+                                          point=True, source='SUN', inc_flux=Fsun)
 
+        # save each output to raster to save memory
+        dsi = dsi.assign_coords(time=epo_in)
+        dsi = dsi.expand_dims(dim="time")
+        dsi.flux.rio.to_raster(f"{outdir}{siteid}/{siteid}_{idx}.tif")
+
+    # load and stack dataarrays from list
     list_da = []
-    for epo, da in dsi_list.items():
+    for idx, epo in tqdm(enumerate(epos_utc)): #dsi_list.items():
+        da = xr.load_dataset(f"{outdir}{siteid}/{siteid}_{idx}.tif")
         da = da.assign_coords(time=epo)
         da = da.expand_dims(dim="time")
-
+        da['flux'] = da.band_data
+        da = da.drop_vars("band_data")
         list_da.append(da)
 
     # stack dataarrays in list
@@ -78,8 +90,8 @@ if __name__ == '__main__':
     print(ds)
 
     # get cumulative flux
-    step = 24. * 3600.
-    dssum = (ds * step).sum(dim='time')
+    step_sec = time_step_hours * 3600.
+    dssum = (ds * step_sec).sum(dim='time')
     # get max flux
     dsmax = ds.max(dim='time')
     # get average flux
@@ -115,5 +127,19 @@ if __name__ == '__main__':
     pngout = f"{outdir}{siteid}_stats_{start_time}_{end_time}.png"
     plt.savefig(pngout)
     # plt.show()
+
+    # set up logs
+    log_dict = {}
+    log_dict['Fsun'] = Fsun
+    log_dict['Rb'] = Rb
+    log_dict['base_resolution'] = base_resolution
+    log_dict['tif_path'] = f'{indir}{siteid}_final_adj_5mpp_surf.tif'
+    log_dict['outdir'] = f"{root}out/"
+    log_dict['start_time'] = start_time
+    log_dict['end_time'] = end_time
+    log_dict['time_step_hours'] = time_step_hours
+    log_dict['runtime_sec'] = round(time.time() - start, 2)
+    with open(f"{outdir}illum_stats_{siteid}_{int(time.time())}", "w") as fp:
+        json.dump(log_dict, fp, indent=4)
 
 
