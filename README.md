@@ -1,11 +1,11 @@
-# PyShade #
+# ShadowSpy #
 
-### Download PyShade and setup an empty environment (Linux guide)
-1) Download PyShade folder or `git clone https://github.com/steo85it/pyshade.git` 
+### Download ShadowSpy and setup an empty environment (Linux guide)
+1) Download ShadowSpy folder or `git clone https://github.com/steo85it/shadowspy.git` 
 2) `python -m venv your_env`
 3) `source your_env/bin/activate`
 ### Install dependencies
-4) cd "PATH_TO_PYSHADE_FOLDER"
+4) cd "PATH_TO_SHADOWSPY_FOLDER"
 5) `pip install -r requirements.txt`
 6) `pip install -e .`
 
