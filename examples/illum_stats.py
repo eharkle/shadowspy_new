@@ -1,3 +1,4 @@
+import sys
 import glob
 import json
 import logging
@@ -19,7 +20,7 @@ if __name__ == '__main__':
     start = time.time()
 
     # DM2, S01, Haworth close to ray, De Gerlache S11, Malapert
-    siteid = 'Site23' # 'DM2'
+    siteid = sys.argv[1] # 'Site23' # 'DM2'
 
     # compute direct flux from the Sun
     Fsun = 1361  # W/m2
@@ -33,8 +34,9 @@ if __name__ == '__main__':
 
     # Elevation/DEM GTiff input
     indir = f"{root}aux/"
-    tif_path = f'{indir}{siteid}_final_adj_5mpp_surf.tif'  #
+    tif_path = f'{indir}{siteid}_GLDELEV_001.tif' # _final_adj_5mpp_surf.tif'  #
     outdir = f"{root}out/"
+    os.makedirs(f"{outdir}{siteid}/", exist_ok=True)
     meshpath = tif_path.split('.')[0]
 
     # prepare mesh of the input dem
@@ -54,8 +56,8 @@ if __name__ == '__main__':
 
     # get list of images from mapprojected folder
     # epos_utc = ['2023-09-29 06:00:00.0']
-    start_time = datetime.date(2023, 9, 1)
-    end_time = datetime.date(2023, 9, 29)
+    start_time = datetime.date(2024, 2, 1)
+    end_time = datetime.date(2024, 2, 28)
     time_step_hours = 24
     s = pd.Series(pd.date_range(start_time, end_time, freq=f'{time_step_hours}H')
                   .strftime('%Y-%m-%d %H:%M:%S.%f'))
@@ -73,8 +75,9 @@ if __name__ == '__main__':
         dsi = dsi.expand_dims(dim="time")
         dsi.flux.rio.to_raster(f"{outdir}{siteid}/{siteid}_{idx}.tif")
         dsi.flux.plot(clim=[0, 350])
-        plt.savefig(f'{outdir}{siteid}_illum_{epo_in}_{idx}.png')
-
+        plt.savefig(f'{outdir}{siteid}/{siteid}_illum_{epo_in}_{idx}.png')
+        plt.clf()
+        
     # load and stack dataarrays from list
     list_da = []
     for idx, epo in tqdm(enumerate(epos_utc)): #dsi_list.items():
@@ -103,19 +106,18 @@ if __name__ == '__main__':
     format_code = '%Y%m%d%H%M%S'
     start_time = start_time.strftime(format_code)
     end_time = end_time.strftime(format_code)
-    os.makedirs(outdir, exist_ok=True)
 
     sumout = f"{outdir}{siteid}_sum_{start_time}_{end_time}.tif"
     dssum.flux.rio.to_raster(sumout)
-    logging.info(f"- Cumulative flux over {list(dsi_list.keys())[0]} to {list(dsi_list.keys())[-1]} saved to {sumout}.")
+    logging.info(f"- Cumulative flux saved to {sumout}.")
 
     maxout = f"{outdir}{siteid}_max_{start_time}_{end_time}.tif"
     dsmax.flux.rio.to_raster(maxout)
-    logging.info(f"- Maximum flux over {list(dsi_list.keys())[0]} to {list(dsi_list.keys())[-1]} saved to {maxout}.")
+    logging.info(f"- Maximum flux saved to {maxout}.")
 
     meanout = f"{outdir}{siteid}_mean_{start_time}_{end_time}.tif"
     dsmean.flux.rio.to_raster(meanout)
-    logging.info(f"- Average flux over {list(dsi_list.keys())[0]} to {list(dsi_list.keys())[-1]} saved to {meanout}.")
+    logging.info(f"- Average flux over saved to {meanout}.")
 
     # plot statistics
     fig, axes = plt.subplots(1, 3, figsize=(26, 6))

@@ -8,3 +8,7 @@ examples/kernels
 *.vtk
 .*
 examples/out
+*/slurm*
+examples/aux/*.tif
+examples/*tar.gz
+examples/aux/*.ply
