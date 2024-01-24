@@ -5,12 +5,11 @@ import meshio
 import numpy as np
 import rioxarray as rio
 
-from src.coord_tools import unproject_stereographic, sph2cart
-from src.mesh_util import get_uniform_triangle_mesh
+from shadowspy.coord_tools import unproject_stereographic, sph2cart
+from shadowspy.mesh_util import get_uniform_triangle_mesh
 
 
-def make(base_resolution, decimation_rates, tif_path, out_path, mesh_ext='.xmf'):
-    Rp = 1737.4
+def make(base_resolution, decimation_rates, tif_path, out_path, mesh_ext='.xmf', plarad=1737.4, lonlat0=(0, -90)):
 
     rds = rio.open_rasterio(tif_path)
     tiff_resolution = int(rds.rio.resolution()[0])
@@ -51,10 +50,10 @@ def make(base_resolution, decimation_rates, tif_path, out_path, mesh_ext='.xmf')
             if coord_style == "cart":
 
                 lon, lat = unproject_stereographic(mesh_versions[decimation]['V'][:, 0],
-                                                   mesh_versions[decimation]['V'][:, 1], 0, -90,
-                                                   R=Rp) # + mesh_versions[decimation]['V'][:, 2])
+                                                   mesh_versions[decimation]['V'][:, 1], lonlat0[0], lonlat0[1],
+                                                   R=plarad) # + mesh_versions[decimation]['V'][:, 2])
 
-                x, y, z = sph2cart(Rp + mesh_versions[decimation]['V'][:, 2], lat, lon)
+                x, y, z = sph2cart(plarad + mesh_versions[decimation]['V'][:, 2], lat, lon)
                 V_cart = np.vstack([x, y, z]).T
                 mesh = meshio.Mesh(V_cart, [('triangle', mesh_versions[decimation]['F'])])
                 # fout = f"in/shackleton_{np.product(mesh_versions[decimation]['shape'])*2}.ply"

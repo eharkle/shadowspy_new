@@ -7,15 +7,15 @@ import pandas as pd
 import geopandas as gpd
 from matplotlib import pyplot as plt
 
-from src.import_mesh import import_mesh
-from src.mesh_util import crop_mesh
-from src.spice_util import get_sourcevec
-from src.shape import CgalTrimeshShapeModel  # , EmbreeTrimeshShapeModel
+from shadowspy.import_mesh import import_mesh
+from shadowspy.mesh_util import crop_mesh
+from shadowspy.spice_util import get_sourcevec
+from shadowspy.shape import CgalTrimeshShapeModel  # , EmbreeTrimeshShapeModel
 import xarray as xr
 from rasterio.enums import Resampling
 
-from src.photometry import mmpf_mh_boyd2017lpsc
-from src.math_util import angle_btw
+from shadowspy.photometry import mmpf_mh_boyd2017lpsc
+from shadowspy.math_util import angle_btw
 
 
 def plot3d(mesh_path, var_to_plot, center='P'):

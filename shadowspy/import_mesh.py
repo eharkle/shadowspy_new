@@ -1,5 +1,5 @@
 import meshio
-from src.shape import get_centroids as get_cents, get_surface_normals
+from shadowspy.shape import get_centroids as get_cents, get_surface_normals
 
 def import_mesh(mesh_path, get_normals=False, get_centroids=False):
     # use meshio to import obj shapefile

@@ -1,8 +1,8 @@
 import meshio
 import numpy as np
 
-from src.import_mesh import import_mesh
-from src.shape import get_centroids
+from shadowspy.import_mesh import import_mesh
+from shadowspy.shape import get_centroids
 
 
 def get_uniform_triangle_mesh(xgrid, ygrid, data, decimation=1):

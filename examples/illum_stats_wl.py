@@ -11,9 +11,9 @@ from tqdm import tqdm
 from matplotlib import pyplot as plt
 
 from examples.download_kernels import download_kernels
-from src import prepare_meshes
-from src.render_dem import render_at_date, irradiance_at_date
-from src.flux_util import get_Fsun
+from shadowspy import prepare_meshes
+from shadowspy.render_dem import render_at_date, irradiance_at_date
+from shadowspy.flux_util import get_Fsun
 
 if __name__ == '__main__':
 
@@ -74,7 +74,7 @@ if __name__ == '__main__':
         # retrieve UV flux
         Fsun = get_Fsun(flux_path, epo_in, wavelength=[0, 320])
         dsi, epo_out = irradiance_at_date(meshes={'stereo': f"{meshpath}_st{ext}", 'cart': f"{meshpath}{ext}"},
-                                          path_to_furnsh=f"{indir}simple.furnsh", epo_utc=epo_in, Fsun=Fsun,
+                                          path_to_furnsh=f"{indir}simple.furnsh", epo_utc=epo_in, inc_flux=Fsun,
                                           show=False)
         # save each output to raster to save memory
         dsi = dsi.assign_coords(time=epo_in)

@@ -11,8 +11,8 @@ from tqdm import tqdm
 from matplotlib import pyplot as plt
 
 from examples.download_kernels import download_kernels
-from src import prepare_meshes
-from src.render_dem import render_at_date, irradiance_at_date
+from shadowspy import prepare_meshes
+from shadowspy.render_dem import render_at_date, irradiance_at_date
 
 if __name__ == '__main__':
 
