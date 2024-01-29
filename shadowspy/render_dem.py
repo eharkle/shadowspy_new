@@ -7,6 +7,7 @@ import pandas as pd
 import geopandas as gpd
 from matplotlib import pyplot as plt
 
+from coord_tools import cart2sph, azimuth_elevation_to_cartesian
 from shadowspy.import_mesh import import_mesh
 from shadowspy.mesh_util import crop_mesh
 from shadowspy.spice_util import get_sourcevec
@@ -61,25 +62,28 @@ def extended_sun(sun_vecs, extsun_coord):
 
 
 def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN', inc_flux=1361., center='P',
-                     point=True, basemesh=None, return_irradiance=False, azi_ele=None):
+                     point=True, basemesh=None, return_irradiance=False, azi_ele_deg=None):
     if center == 'V':
         C = shape_model.V
         N = shape_model.VN
     elif center == 'P':
         C = shape_model.P
         N = shape_model.N
+    else:
+        logging.error("*** center should be set to V or P. Exit.")
+        exit()
 
-    if azi_ele == None:
+    if azi_ele_deg == None:
         point_source_vecs = get_sourcevec(utc0=utc0, stepet=1, et_linspace=np.linspace(0, 1, 1),
                                    path_to_furnsh=path_to_furnsh,
                                    target=source, frame='MOON_ME', observer='MOON')
     else:
-        azimuth = np.deg2rad(azi_ele[0])
-        elevation = np.deg2rad(azi_ele[1])
-
-        point_source_vecs = [np.cos(elevation)*np.sin(azimuth),
-                             np.cos(elevation)*np.cos(azimuth),
-                             np.sin(elevation)]
+        latitude_deg, longitude_deg = np.rad2deg(np.vstack(cart2sph(np.mean(C, axis=0)))[1:])
+        logging.warning("- Using source_distance = 1.5e8 km ~ 1AU. Adapt for other bodies.")
+        point_source_vecs = azimuth_elevation_to_cartesian(azimuth_deg=azi_ele_deg[0], elevation_deg=azi_ele_deg[1],
+                                                           distance=1.5e8,
+                                                           observer_lat=latitude_deg[0], observer_lon=longitude_deg[0],
+                                                           observer_alt=0)
 
     if point:
         # if point Sun
@@ -123,8 +127,8 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN
     return E * albedo1 * photom1 * np.pi / inc_flux
 
 
-def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_mask=None, source='SUN',
-                   inc_flux=1361, basemesh_path=None, show=False, point=True, azi_ele=None, return_irradiance=False):
+def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_mask=None, source='SUN', inc_flux=1361,
+                   basemesh_path=None, show=False, point=True, azi_ele_deg=None, return_irradiance=False):
     """
     Render terrain at epoch
     :param pdir:
@@ -169,9 +173,9 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
         basemesh = None
 
     # get flux at observer (would be good to just ask for F/V overlapping with meas image)
-    flux_at_obs = get_flux_at_date(shape_model, date_illum_spice, path_to_furnsh=path_to_furnsh,
-                                   source=source, inc_flux=inc_flux, azi_ele=azi_ele,
-                                   center=center, point=point, basemesh=basemesh, return_irradiance=return_irradiance)
+    flux_at_obs = get_flux_at_date(shape_model, date_illum_spice, path_to_furnsh=path_to_furnsh, source=source,
+                                   inc_flux=inc_flux, center=center, point=point, basemesh=basemesh,
+                                   return_irradiance=return_irradiance, azi_ele_deg=azi_ele_deg)
 
     if show:
         # plot3d(mesh_path=f"{meshes['cart']}", var_to_plot=flux_at_obs)
@@ -224,8 +228,8 @@ def irradiance_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, de
     if not return_irradiance:
         logging.error("* Either set return_irradiance=True, or else call render_at_date.")
 
-    return render_at_date(meshes, epo_utc, path_to_furnsh, center, crs, dem_mask,source,
-                          inc_flux, basemesh_path, show, point, return_irradiance)
+    return render_at_date(meshes, epo_utc, path_to_furnsh, center, crs, dem_mask, source, inc_flux, basemesh_path, show,
+                          point, return_irradiance)
 
 
 def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
@@ -268,10 +272,8 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
     meas_outer_poly = gpd.GeoDataFrame({'geometry': meas_outer_poly.buffer(50, join_style=2)})
 
     # get full rendering at date
-    dsi, date_illum_str = render_at_date(meshes, epo_utc, path_to_furnsh, crs=meas.rio.crs,
-                                         dem_mask=meas_outer_poly, center=center,
-                                         basemesh_path=basemesh, point=point
-                                         )
+    dsi, date_illum_str = render_at_date(meshes, epo_utc, path_to_furnsh, center=center, crs=meas.rio.crs,
+                                         dem_mask=meas_outer_poly, basemesh_path=basemesh, point=point)
 
     # interp to measured image coordinates
     rendering = dsi.rio.reproject_match(meas, Resampling=Resampling.bilinear,

@@ -86,3 +86,103 @@ def project_stereographic(lon, lat, lon0, lat0, R=1):
     y = k * (cosd(lat0) * sind_lat - sind(lat0) * cosd_lat * cosd_lon_lon0)
 
     return x, y
+
+
+def compute_azimuth_elevation(observer_lat, observer_lon, observer_alt, target_pos):
+    """
+    Computes the azimuth and elevation angles from a given observer's location on Earth to a target position in ECEF coordinates.
+
+    :param observer_lat: Latitude of the observer in degrees.
+    :param observer_lon: Longitude of the observer in degrees.
+    :param observer_alt: Altitude of the observer in meters.
+    :param target_pos: Target position in ECEF coordinates (array-like of x, y, z).
+    :return: Tuple of azimuth and elevation angles in degrees.
+
+    Example:
+    # >>> target_pos_input = [1.41432411e+08, -5.58812792e+07, -1.11768748e+06]
+    # >>> observer_lon = 29
+    # >>> observer_lat = -85.38
+    # >>> observer_alt = 0
+    # >>> azimuth_deg, elevation_deg = compute_azimuth_elevation(observer_lat, observer_lon, observer_alt, target_pos_input)
+    # >>> print(azimuth_deg, elevation_deg)
+    """
+
+    # Convert latitude and longitude to radians
+    lat_rad = np.radians(observer_lat)
+    lon_rad = np.radians(observer_lon)
+
+    # Observer's local frame transformation matrix (ECEF to ENU)
+    trans_matrix = np.array([
+        [-np.sin(lon_rad), np.cos(lon_rad), 0],
+        [-np.sin(lat_rad) * np.cos(lon_rad), -np.sin(lat_rad) * np.sin(lon_rad), np.cos(lat_rad)],
+        [np.cos(lat_rad) * np.cos(lon_rad), np.cos(lat_rad) * np.sin(lon_rad), np.sin(lat_rad)]
+    ])
+
+    # Convert target position from ECEF to ENU coordinates
+    local_vector = np.dot(trans_matrix, target_pos - np.array([0, 0, observer_alt]))
+
+    # Compute azimuth and elevation
+    east = local_vector[0]
+    north = local_vector[1]
+    up = local_vector[2]
+    azimuth_rad = np.arctan2(east, north)
+    elevation_rad = np.arcsin(up / np.linalg.norm(local_vector))
+
+    # Convert from radians to degrees
+    azimuth_deg = np.degrees(azimuth_rad)
+    elevation_deg = np.degrees(elevation_rad)
+
+    return azimuth_deg, elevation_deg
+
+
+def azimuth_elevation_to_cartesian(azimuth_deg, elevation_deg, distance, observer_lat, observer_lon, observer_alt):
+    """
+    Converts azimuth and elevation angles back to Cartesian coordinates in the ECEF system.
+
+    :param azimuth_deg: Azimuth angle in degrees.
+    :param elevation_deg: Elevation angle in degrees.
+    :param distance: Distance from the observer to the target in meters.
+    :param observer_lat: Latitude of the observer in degrees.
+    :param observer_lon: Longitude of the observer in degrees.
+    :param observer_alt: Altitude of the observer in meters.
+    :return: Target position in ECEF coordinates (array-like of x, y, z).
+
+    Example:
+    # >>> azimuth_deg = 120.5
+    # >>> elevation_deg = 45.0
+    # >>> distance = 100000
+    # >>> observer_lat = -85.38
+    # >>> observer_lon = 29
+    # >>> observer_alt = 0
+    # >>> target_pos_output = azimuth_elevation_to_cartesian(azimuth_deg, elevation_deg, distance, observer_lat, observer_lon, observer_alt)
+    # >>> print(target_pos_output)
+    """
+
+    # Convert azimuth and elevation to radians
+    azimuth_rad = np.radians(azimuth_deg)
+    elevation_rad = np.radians(elevation_deg)
+
+    # Convert observer latitude and longitude from degrees to radians
+    observer_lat_rad = np.radians(observer_lat)
+    observer_lon_rad = np.radians(observer_lon)
+
+    # Convert azimuth and elevation to Cartesian coordinates in ENU system
+    x_enu = distance * np.cos(elevation_rad) * np.sin(azimuth_rad)
+    y_enu = distance * np.cos(elevation_rad) * np.cos(azimuth_rad)
+    z_enu = distance * np.sin(elevation_rad)
+
+    # ENU to ECEF transformation matrix
+    trans_matrix = np.array([
+        [-np.sin(observer_lon_rad), np.cos(observer_lon_rad), 0],
+        [-np.cos(observer_lon_rad) * np.sin(observer_lat_rad), -np.sin(observer_lon_rad) * np.sin(observer_lat_rad),
+         np.cos(observer_lat_rad)],
+        [np.cos(observer_lon_rad) * np.cos(observer_lat_rad), np.sin(observer_lon_rad) * np.cos(observer_lat_rad),
+         np.sin(observer_lat_rad)]
+    ])
+
+    # Convert ENU coordinates to ECEF
+    target_pos_ecef = np.dot(trans_matrix.T, np.array([x_enu, y_enu, z_enu])) + np.array([0, 0, observer_alt])
+
+    return target_pos_ecef
+
+

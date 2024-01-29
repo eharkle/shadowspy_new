@@ -19,7 +19,7 @@ if __name__ == '__main__':
     # compute direct flux from the Sun
     Fsun = 1361  # W/m2
     Rb = 1737.4 # km
-    lonlat0_stereo = (0, 90)
+    lonlat0_stereo = (0, -90)
     base_resolution = 60
     root = "examples/"
     os.makedirs(root, exist_ok=True)
@@ -55,13 +55,14 @@ if __name__ == '__main__':
     # cumindex = pd.read_csv(lnac_index, index_col=None)
 
     # get list of images from mapprojected folder
-    azi_ele_list = [(0, 30), (0, 90), (45, 30)]
+    azi_ele_list = [(0, 30), (0, 90), (45, 30)] # (50.67717174965302, 3.3533658872987755)]
     epo_in = '2000-01-01 00:00:00.0'
     print(f"- Rendering input DEM for (azi, ele)={azi_ele_list}.")
 
     for azi_ele in tqdm(azi_ele_list, desc='rendering each epos_utc'):
         dsi, epo_out = render_at_date(meshes={'stereo': f"{meshpath}_st{ext}", 'cart': f"{meshpath}{ext}"},
-                       path_to_furnsh=f"{indir}simple.furnsh", epo_utc=epo_in, show=False, crs=dem_crs, azi_ele=azi_ele)
+                                      epo_utc=epo_in, path_to_furnsh=f"{indir}simple.furnsh", crs=dem_crs, show=False,
+                                      azi_ele_deg=azi_ele)
 
         # save each output to raster
         dsi = dsi.assign_coords(time=epo_in)
