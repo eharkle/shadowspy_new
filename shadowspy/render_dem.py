@@ -61,7 +61,7 @@ def extended_sun(sun_vecs, extsun_coord):
 
 
 def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN', inc_flux=1361., center='P',
-                     point=True, basemesh=None, return_irradiance=False):
+                     point=True, basemesh=None, return_irradiance=False, azi_ele=None):
     if center == 'V':
         C = shape_model.V
         N = shape_model.VN
@@ -69,9 +69,17 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN
         C = shape_model.P
         N = shape_model.N
 
-    point_source_vecs = get_sourcevec(utc0=utc0, stepet=1, et_linspace=np.linspace(0, 1, 1),
+    if azi_ele == None:
+        point_source_vecs = get_sourcevec(utc0=utc0, stepet=1, et_linspace=np.linspace(0, 1, 1),
                                    path_to_furnsh=path_to_furnsh,
                                    target=source, frame='MOON_ME', observer='MOON')
+    else:
+        azimuth = np.deg2rad(azi_ele[0])
+        elevation = np.deg2rad(azi_ele[1])
+
+        point_source_vecs = [np.cos(elevation)*np.sin(azimuth),
+                             np.cos(elevation)*np.cos(azimuth),
+                             np.sin(elevation)]
 
     if point:
         # if point Sun
@@ -116,7 +124,7 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN
 
 
 def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_mask=None, source='SUN',
-                   inc_flux=1361, basemesh_path=None, show=False, point=True, return_irradiance=False):
+                   inc_flux=1361, basemesh_path=None, show=False, point=True, azi_ele=None, return_irradiance=False):
     """
     Render terrain at epoch
     :param pdir:
@@ -162,7 +170,7 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
 
     # get flux at observer (would be good to just ask for F/V overlapping with meas image)
     flux_at_obs = get_flux_at_date(shape_model, date_illum_spice, path_to_furnsh=path_to_furnsh,
-                                   source=source, inc_flux=inc_flux,
+                                   source=source, inc_flux=inc_flux, azi_ele=azi_ele,
                                    center=center, point=point, basemesh=basemesh, return_irradiance=return_irradiance)
 
     if show:
