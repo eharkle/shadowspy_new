@@ -143,6 +143,8 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
     """
 
     input_YYMMGGHHMMSS = datetime.strptime(epo_utc.strip(), '%Y-%m-%d %H:%M:%S.%f')
+    format_code = '%Y%m%d%H%M%S'
+    date_illum_str = input_YYMMGGHHMMSS.strftime(format_code)
     format_code = '%Y %m %d %H:%M:%S'
     date_illum_spice = input_YYMMGGHHMMSS.strftime(format_code)
 
@@ -203,7 +205,7 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
     ds['y'] = ds.y * 1e3
     dsi = ds.interpolate_na(dim="x").interpolate_na(dim="y")
 
-    return dsi, epo_utc
+    return dsi, date_illum_str
 
 
 def irradiance_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_mask=None, source='SUN',
@@ -257,19 +259,13 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
     meas = xr.load_dataarray(meas_path)
     meas = meas.where(meas >= 0)
 
-    ############# simulate smaller image
-    # import shapely
-    # geometries = shapely.box(67400, 121800, 68400, 122200)
-    # meas = meas.rio.clip([geometries])
-    #############
-
     # raster outer shape to polygon
     ds = (meas.coarsen(x=1, boundary="trim").mean(skipna=True).
           coarsen(y=1, boundary="trim").mean(skipna=True))
     df = ds.to_dataframe().reset_index().loc[:, ['x', 'y']] * 1e-3
     meas_outer_poly = gpd.GeoDataFrame(geometry=gpd.points_from_xy(df.x, df.y))
     meas_outer_poly = meas_outer_poly.dropna(axis=0).dissolve().convex_hull
-    meas_outer_poly = gpd.GeoDataFrame({'geometry': meas_outer_poly.buffer(50, join_style=2)})
+    meas_outer_poly = gpd.GeoDataFrame({'geometry': meas_outer_poly.buffer(0.05, join_style=2)})
 
     # get full rendering at date
     dsi, date_illum_str = render_at_date(meshes, epo_utc, path_to_furnsh, center=center, crs=meas.rio.crs,
@@ -294,15 +290,6 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
     # save simulated image to raster
     outraster = f"{outdir}{img_name}_{date_illum_str}.tif"
     rendering.transpose('y', 'x').rio.to_raster(outraster)
-
-    #####
-    dsi.transpose('y', 'x').rio.to_raster(outraster) # full DEM region
-    rendering.flux.plot(robust=True)
-    plt.show()
-    meas.plot(robust=True)
-    plt.show()
-    # rendering.rio.to_raster(outraster)
-    #####
 
     print(f"- Flux for {img_name} saved to {outraster} (xy resolution = {rendering.rio.resolution()}mpp).")
 
