@@ -7,7 +7,7 @@ import pandas as pd
 import geopandas as gpd
 from matplotlib import pyplot as plt
 
-from coord_tools import cart2sph, azimuth_elevation_to_cartesian
+from shadowspy.coord_tools import cart2sph, azimuth_elevation_to_cartesian
 from shadowspy.import_mesh import import_mesh
 from shadowspy.mesh_util import crop_mesh
 from shadowspy.spice_util import get_sourcevec
@@ -153,8 +153,8 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
         print(f"- Cropping DEM to {dem_mask}")
         meshes_cropped = {}
         meshes_path = ('/').join(meshes['stereo'].split('/')[:-1])
-        meshes_cropped['stereo'] = f"{meshes_path}/cropped_st.ply"
-        meshes_cropped['cart'] = f"{meshes_path}/cropped.ply"
+        meshes_cropped['stereo'] = f"{meshes_path}/cropped_st.vtk"
+        meshes_cropped['cart'] = f"{meshes_path}/cropped.vtk"
 
         crop_mesh(dem_mask, meshes, mask=dem_mask, meshes_cropped=meshes_cropped)
 
