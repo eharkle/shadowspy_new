@@ -10,7 +10,7 @@ setuptools.setup(
     author_email='stefano.bertone@umd.edu',
     description='A collection of tools for the illumination of planetary surfaces leveraging ray tracing techniques',
     url='',
-    # packages=['src'],
+    # packages=['shadowspy'],
     packages=setuptools.find_packages(), #where='src'),
     classifiers=[
         "Programming Language :: Python :: 3",
