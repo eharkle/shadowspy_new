@@ -9,6 +9,7 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 from tqdm import tqdm
+from rasterio.enums import Resampling
 
 from examples.download_kernels import download_kernels
 from shadowspy import prepare_meshes
@@ -19,7 +20,7 @@ if __name__ == '__main__':
     # compute direct flux from the Sun
     Fsun = 1361  # W/m2
     Rb = 1737.4 # km
-    lonlat0_stereo = (0, -90)
+    lonlat0_stereo = (0, 90)
     base_resolution = 60
     root = "examples/"
     os.makedirs(root, exist_ok=True)
@@ -40,7 +41,8 @@ if __name__ == '__main__':
     print(f"- Computing trimesh for {tif_path}...")
 
     # extract crs
-    dem_crs = xr.load_dataset(tif_path).rio.crs
+    dem = xr.load_dataset(tif_path)
+    dem_crs = dem.rio.crs
 
     # regular delauney mesh
     ext = '.vtk'
@@ -69,6 +71,7 @@ if __name__ == '__main__':
         dsi = dsi.expand_dims(dim="time")
         epostr = datetime.strptime(epo_in,'%Y-%m-%d %H:%M:%S.%f')
         epostr = epostr.strftime('%d%m%Y%H%M%S')
-        dsi.flux.plot(robust=True)
-        plt.show()
+        dsi = dsi.rio.reproject_match(dem, resampling=Resampling.bilinear)
+        #dsi.flux.plot(robust=True)
+        #plt.show()
         dsi.flux.rio.to_raster(f"{outdir}{siteid}/{siteid}_{azi_ele[0]}_{azi_ele[1]}.tif")

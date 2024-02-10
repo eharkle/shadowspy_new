@@ -10,8 +10,9 @@ import datetime
 import xarray as xr
 from tqdm import tqdm
 from matplotlib import pyplot as plt
+from rasterio.enums import Resampling
 
-from examples.download_kernels import download_kernels
+#from examples.download_kernels import download_kernels
 from shadowspy import prepare_meshes
 from shadowspy.render_dem import render_at_date, irradiance_at_date
 
@@ -25,12 +26,12 @@ if __name__ == '__main__':
     # compute direct flux from the Sun
     Fsun = 1361  # W/m2
     Rb = 1737.4  # km
-    base_resolution = 5
+    base_resolution = 2
     root = "examples/"
     os.makedirs(root, exist_ok=True)
 
     # download kernels
-    download_kernels()
+    #download_kernels()
 
     # Elevation/DEM GTiff input
     indir = f"{root}aux/"
@@ -43,6 +44,10 @@ if __name__ == '__main__':
     start = time.time()
     print(f"- Computing trimesh for {tif_path}...")
 
+    # extract crs
+    dem = xr.load_dataset(tif_path)
+    dem_crs = dem.rio.crs
+    
     # regular delauney mesh
     ext = '.vtk'
     prepare_meshes.make(base_resolution, [1], tif_path, out_path=root, mesh_ext=ext)
@@ -51,21 +56,21 @@ if __name__ == '__main__':
     print(f"- Meshes generated after {round(time.time() - start, 2)} seconds.")
 
     # open index
-    lnac_index = f"{indir}CUMINDEX_LROC.TAB"
-    cumindex = pd.read_csv(lnac_index, index_col=None)
+    #lnac_index = f"{indir}CUMINDEX_LROC.TAB"
+    #cumindex = pd.read_csv(lnac_index, index_col=None)
 
     # get list of images from mapprojected folder
     # epos_utc = ['2023-09-29 06:00:00.0']
-    start_time = datetime.date(2024, 2, 1)
-    end_time = datetime.date(2024, 2, 28)
-    time_step_hours = 24
+    start_time = datetime.date(2025, 6, 21)
+    end_time = datetime.date(2025, 9, 21)
+    time_step_hours = 12
     s = pd.Series(pd.date_range(start_time, end_time, freq=f'{time_step_hours}H')
                   .strftime('%Y-%m-%d %H:%M:%S.%f'))
     epos_utc = s.values.tolist()
     print(f"- Rendering input DEM at {epos_utc}.")
 
     dsi_list = {}
-    for idx, epo_in in tqdm(enumerate(epos_utc)):
+    for idx, epo_in in tqdm(enumerate(epos_utc), total=len(epos_utc)):
         dsi, epo_out = irradiance_at_date(meshes={'stereo': f"{meshpath}_st{ext}", 'cart': f"{meshpath}{ext}"},
                                             path_to_furnsh=f"{indir}simple.furnsh", epo_utc=epo_in,
                                           point=True, source='SUN', inc_flux=Fsun)
@@ -73,9 +78,12 @@ if __name__ == '__main__':
         # save each output to raster to save memory
         dsi = dsi.assign_coords(time=epo_in)
         dsi = dsi.expand_dims(dim="time")
+        dsi = dsi.rio.reproject_match(dem, resampling=Resampling.bilinear)
         dsi.flux.rio.to_raster(f"{outdir}{siteid}/{siteid}_{idx}.tif")
         dsi.flux.plot(clim=[0, 350])
-        plt.savefig(f'{outdir}{siteid}/{siteid}_illum_{epo_in}_{idx}.png')
+        epostr = datetime.strptime(epo_in,'%Y-%m-%d %H:%M:%S.%f')
+        epostr = epostr.strftime('%y%m%d%H%M%S')
+        plt.savefig(f'{outdir}{siteid}/{siteid}_illum_{epostr}_{idx}.png')
         plt.clf()
         
     # load and stack dataarrays from list
@@ -137,7 +145,7 @@ if __name__ == '__main__':
     log_dict['Fsun'] = Fsun
     log_dict['Rb'] = Rb
     log_dict['base_resolution'] = base_resolution
-    log_dict['tif_path'] = f'{indir}{siteid}_final_adj_5mpp_surf.tif'
+    log_dict['tif_path'] = f'{indir}{siteid}_GLDELEV_001.tif' # _final_adj_5mpp_surf.tif'
     log_dict['outdir'] = f"{root}out/"
     log_dict['start_time'] = start_time
     log_dict['end_time'] = end_time

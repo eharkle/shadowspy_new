@@ -231,7 +231,7 @@ def irradiance_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, de
         logging.error("* Either set return_irradiance=True, or else call render_at_date.")
 
     return render_at_date(meshes, epo_utc, path_to_furnsh, center, crs, dem_mask, source, inc_flux, basemesh_path, show,
-                          point, return_irradiance)
+                          point, azi_ele_deg=None, return_irradiance=return_irradiance)
 
 
 def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
