@@ -275,9 +275,26 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
     rendering = dsi.rio.reproject_match(meas, Resampling=Resampling.bilinear,
                                         nodata=np.nan)
 
-    # apply "exposure factor" (median of ratio) to rendered image
+    # TODO make the threshold an adjustable parameter
+    mask = meas.sel({'band': 1}) > 0.005
+
+    # # apply "exposure factor" (median of ratio) to rendered image
     exposure_factor = rendering.flux.values / meas.sel({'band': 1}).values
-    exposure_factor = np.median(exposure_factor.ravel()[~np.isnan(exposure_factor.ravel())])
+    # plt.imshow(np.log10(exposure_factor), vmax=1, vmin=-1)
+    # plt.colorbar()
+    # plt.show()
+
+    exposure_factor = exposure_factor[mask]
+    # print(np.min(exposure_factor), np.max(exposure_factor), np.mean(exposure_factor),
+    #       np.median(exposure_factor), np.std(exposure_factor))
+    #
+    # fig, ax = plt.subplots()
+    # ax.hist(rendering.flux.values.ravel(), bins=100, range=[0.001,0.05], label='rendering')
+    # ax.hist(meas.sel({'band': 1}).values.ravel(), bins=100, range=[0.001,0.05], label='NAC')
+    # plt.legend()
+    # plt.show()
+
+    exposure_factor = np.median(exposure_factor) #.ravel()[~np.isnan(exposure_factor.ravel())])
 
     if exposure_factor > 0:
         rendering /= exposure_factor
