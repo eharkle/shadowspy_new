@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 import colorcet as cc
 
 from shape import CgalTrimeshShapeModel
-from import_mesh import import_mesh
+from mesh_utils import import_mesh
 from spice_util import get_sourcevec
 
 

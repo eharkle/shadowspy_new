@@ -6,7 +6,7 @@ import numpy as np
 import rioxarray as rio
 
 from coord_tools import unproject_stereographic, sph2cart
-from mesh_util import get_uniform_triangle_mesh
+from mesh_tools import get_uniform_triangle_mesh
 
 
 def generate_square_with_hole_vertices(outer_square_size=10, hole_size=2, spacing=1):
