@@ -12,9 +12,8 @@ from tqdm import tqdm
 from matplotlib import pyplot as plt
 from rasterio.enums import Resampling
 
-#from examples.download_kernels import download_kernels
-from shadowspy import prepare_meshes
-from shadowspy.render_dem import render_at_date, irradiance_at_date
+import mesh_generation
+from shadowspy.render_dem import irradiance_at_date
 
 if __name__ == '__main__':
 
@@ -50,7 +49,7 @@ if __name__ == '__main__':
     
     # regular delauney mesh
     ext = '.vtk'
-    prepare_meshes.make(base_resolution, [1], tif_path, out_path=root, mesh_ext=ext)
+    mesh_generation.make(base_resolution, [1], tif_path, out_path=root, mesh_ext=ext)
     shutil.move(f"{root}b{base_resolution}_dn1{ext}", f"{meshpath}{ext}")
     shutil.move(f"{root}b{base_resolution}_dn1_st{ext}", f"{meshpath}_st{ext}")
     print(f"- Meshes generated after {round(time.time() - start, 2)} seconds.")

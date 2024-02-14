@@ -11,8 +11,8 @@ import pandas as pd
 from tqdm import tqdm
 from rasterio.enums import Resampling
 
+import mesh_generation
 from examples.download_kernels import download_kernels
-from shadowspy import prepare_meshes
 from shadowspy.render_dem import render_at_date
 
 if __name__ == '__main__':
@@ -44,10 +44,16 @@ if __name__ == '__main__':
     dem = xr.load_dataset(tif_path)
     dem_crs = dem.rio.crs
 
+    small_tif = xr.load_dataset(tif_path).isel(band=0, x=slice(None, 200), y=slice(None, 200))
+    print(small_tif)
+    print(small_tif.rio.resolution())
+    tif_path = f'{indir}np0_20mpp_smaller.tif'#
+    small_tif.rio.to_raster(tif_path)
+
     # regular delauney mesh
     ext = '.vtk'
-    prepare_meshes.make(base_resolution, [1], tif_path, out_path=root, mesh_ext=ext,
-                        plarad=Rb, lonlat0=lonlat0_stereo)
+    mesh_generation.make(base_resolution, [1], tif_path, out_path=root, mesh_ext=ext,
+                         plarad=Rb, lonlat0=lonlat0_stereo)
     shutil.move(f"{root}b{base_resolution}_dn1{ext}", f"{meshpath}{ext}")
     shutil.move(f"{root}b{base_resolution}_dn1_st{ext}", f"{meshpath}_st{ext}")
     print(f"- Meshes generated after {round(time.time() - start, 2)} seconds.")

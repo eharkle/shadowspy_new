@@ -7,15 +7,16 @@ import xarray as xr
 import pandas as pd
 from tqdm import tqdm
 import sys
+
+import mesh_generation
 from examples.download_kernels import download_kernels
-from shadowspy import prepare_meshes
 from shadowspy.render_dem import render_at_date
 from rasterio.enums import Resampling
 
 if __name__ == '__main__':
 
     siteid = sys.argv[1] # 'Site23' # 'DM2'
-    
+
     # compute direct flux from the Sun
     Fsun = 1361  # W/m2
     Rb = 1737.4 # km
@@ -44,8 +45,8 @@ if __name__ == '__main__':
 
     # regular delauney mesh
     ext = '.vtk'
-    prepare_meshes.make(base_resolution, [1], tif_path, out_path=root, mesh_ext=ext,
-                        plarad=Rb, lonlat0=lonlat0_stereo)
+    mesh_generation.make(base_resolution, [1], tif_path, out_path=root, mesh_ext=ext,
+                         plarad=Rb, lonlat0=lonlat0_stereo)
     shutil.move(f"{root}b{base_resolution}_dn1{ext}", f"{meshpath}{ext}")
     shutil.move(f"{root}b{base_resolution}_dn1_st{ext}", f"{meshpath}_st{ext}")
     print(f"- Meshes generated after {round(time.time() - start, 2)} seconds.")
@@ -66,7 +67,8 @@ if __name__ == '__main__':
 
     for epo_in in tqdm(epos_utc, desc='rendering each epos_utc', total=len(epos_utc)):
         dsi, epo_out = render_at_date(meshes={'stereo': f"{meshpath}_st{ext}", 'cart': f"{meshpath}{ext}"},
-                                      path_to_furnsh=f"{indir}simple.furnsh", epo_utc=epo_in, show=False, crs=dem_crs, point=True, source='SUN', inc_flux=Fsun)
+                                      path_to_furnsh=f"{indir}simple.furnsh", epo_utc=epo_in, show=False,
+                                      crs=dem_crs, point=True, source='SUN', inc_flux=Fsun)
 
         # save each output to raster
         dsi = dsi.assign_coords(time=epo_in)

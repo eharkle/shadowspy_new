@@ -131,17 +131,21 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
                    basemesh_path=None, show=False, point=True, azi_ele_deg=None, return_irradiance=False):
     """
     Render terrain at epoch
-    :param pdir:
-    :param meshes: dict
-    :param path_to_furnsh:
-    :param epo_utc:
-    :param outdir:
-    :param center:
-    :param crs:
-    :param dem_mask: GeoDataFrame, polygon of region to crop
-    :return:
+    @param meshes:
+    @param epo_utc:
+    @param path_to_furnsh:
+    @param center:
+    @param crs:
+    @param dem_mask: GeoDataFrame, polygon of region to crop
+    @param source:
+    @param inc_flux:
+    @param basemesh_path: str, full inner+outer mesh path (inner part should be identical to meshes)
+    @param show:
+    @param point: Bool, use point or extended (if False) source
+    @param azi_ele_deg:
+    @param return_irradiance:
+    @return:
     """
-
     input_YYMMGGHHMMSS = datetime.strptime(epo_utc.strip(), '%Y-%m-%d %H:%M:%S.%f')
     format_code = '%Y%m%d%H%M%S'
     date_illum_str = input_YYMMGGHHMMSS.strftime(format_code)

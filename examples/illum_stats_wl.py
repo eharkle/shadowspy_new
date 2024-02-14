@@ -10,8 +10,8 @@ import xarray as xr
 from tqdm import tqdm
 from matplotlib import pyplot as plt
 
+import mesh_generation
 from examples.download_kernels import download_kernels
-from shadowspy import prepare_meshes
 from shadowspy.render_dem import render_at_date, irradiance_at_date
 from shadowspy.flux_util import get_Fsun
 
@@ -45,7 +45,7 @@ if __name__ == '__main__':
 
     # regular delauney mesh
     ext = '.vtk'
-    prepare_meshes.make(base_resolution, [1], tif_path, out_path=f"{indir}{siteid}_", mesh_ext=ext)
+    mesh_generation.make(base_resolution, [1], tif_path, out_path=f"{indir}{siteid}_", mesh_ext=ext)
     shutil.move(f"{indir}{siteid}_b{base_resolution}_dn1{ext}", f"{meshpath}{ext}")
     shutil.move(f"{indir}{siteid}_b{base_resolution}_dn1_st{ext}", f"{meshpath}_st{ext}")
     print(f"- Meshes generated after {round(time.time() - start, 2)} seconds.")

@@ -6,8 +6,8 @@ import time
 import matplotlib.pyplot as plt
 import pandas as pd
 
+import mesh_generation
 from examples.download_kernels import download_kernels
-from shadowspy import prepare_meshes
 from shadowspy.image_util import read_img_properties
 from shadowspy.render_dem import render_match_image
 import xarray as xr
@@ -40,7 +40,7 @@ if __name__ == '__main__':
     fartopo = xr.load_dataset(tif_path)
     fartopo -= Rb*1e3
     fartopo.band_data.rio.to_raster(f"{indir}dm2_rescaled.tif")
-    prepare_meshes.make(base_resolution, [1], f"{indir}dm2_rescaled.tif", out_path=root, mesh_ext=ext)
+    mesh_generation.make(base_resolution, [1], f"{indir}dm2_rescaled.tif", out_path=root, mesh_ext=ext)
     shutil.move(f"{root}b{base_resolution}_dn1{ext}", f"{meshpath}{ext}")
     shutil.move(f"{root}b{base_resolution}_dn1_st{ext}", f"{meshpath}_st{ext}")
     print(f"- Meshes generated after {round(time.time() - start, 2)} seconds.")
@@ -53,7 +53,7 @@ if __name__ == '__main__':
     # xr.load_dataset(f"{indir}fartopo_rescaled.tif").band_data.plot(robust=True)
     # plt.show()
     # exit()
-    prepare_meshes.make(120, [1], f"{indir}fartopo_rescaled.tif", out_path=root, mesh_ext=ext)
+    mesh_generation.make(120, [1], f"{indir}fartopo_rescaled.tif", out_path=root, mesh_ext=ext)
     shutil.move(f"{root}b120_dn1{ext}", f"{fartopomesh}{ext}")
     shutil.move(f"{root}b120_dn1_st{ext}", f"{fartopomesh}_st{ext}")
     print(f"- Far topo meshes generated after {round(time.time() - start, 2)} seconds.")

@@ -4,8 +4,8 @@ import shutil
 import time
 import pandas as pd
 
+import mesh_generation
 from examples.download_kernels import download_kernels
-from shadowspy import prepare_meshes
 from shadowspy.image_util import read_img_properties
 from shadowspy.render_dem import render_match_image
 
@@ -32,7 +32,7 @@ if __name__ == '__main__':
 
     # regular delauney mesh
     ext = '.vtk'
-    prepare_meshes.make(base_resolution, [1], tif_path, out_path=root, mesh_ext=ext)
+    mesh_generation.make(base_resolution, [1], tif_path, out_path=root, mesh_ext=ext)
     shutil.move(f"{root}b{base_resolution}_dn1{ext}", f"{meshpath}{ext}")
     shutil.move(f"{root}b{base_resolution}_dn1_st{ext}", f"{meshpath}_st{ext}")
     print(f"- Meshes generated after {round(time.time() - start, 2)} seconds.")
