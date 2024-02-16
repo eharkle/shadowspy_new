@@ -5,11 +5,10 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import geopandas as gpd
-from matplotlib import pyplot as plt
 
-from coord_tools import cart2sph, azimuth_elevation_to_cartesian
-from mesh_utils import import_mesh
-from mesh_tools import crop_mesh
+from shadowspy.coord_tools import cart2sph, azimuth_elevation_to_cartesian
+from mesh_operations.mesh_utils import import_mesh
+from mesh_operations.mesh_tools import crop_mesh
 from shadowspy.spice_util import get_sourcevec
 from shadowspy.shape import CgalTrimeshShapeModel  # , EmbreeTrimeshShapeModel
 import xarray as xr
@@ -131,18 +130,24 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
                    basemesh_path=None, show=False, point=True, azi_ele_deg=None, return_irradiance=False):
     """
     Render terrain at epoch
-    :param pdir:
-    :param meshes: dict
-    :param path_to_furnsh:
-    :param epo_utc:
-    :param outdir:
-    :param center:
-    :param crs:
-    :param dem_mask: GeoDataFrame, polygon of region to crop
-    :return:
+    @param meshes:
+    @param epo_utc:
+    @param path_to_furnsh:
+    @param center:
+    @param crs:
+    @param dem_mask: GeoDataFrame, polygon of region to crop
+    @param source:
+    @param inc_flux:
+    @param basemesh_path: str, full inner+outer mesh path (inner part should be identical to meshes)
+    @param show:
+    @param point: Bool, use point or extended (if False) source
+    @param azi_ele_deg:
+    @param return_irradiance:
+    @return:
     """
-
     input_YYMMGGHHMMSS = datetime.strptime(epo_utc.strip(), '%Y-%m-%d %H:%M:%S.%f')
+    format_code = '%Y%m%d%H%M%S'
+    date_illum_str = input_YYMMGGHHMMSS.strftime(format_code)
     format_code = '%Y %m %d %H:%M:%S'
     date_illum_spice = input_YYMMGGHHMMSS.strftime(format_code)
 
@@ -151,8 +156,8 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
         print(f"- Cropping DEM to {dem_mask}")
         meshes_cropped = {}
         meshes_path = ('/').join(meshes['stereo'].split('/')[:-1])
-        meshes_cropped['stereo'] = f"{meshes_path}/cropped_st.ply"
-        meshes_cropped['cart'] = f"{meshes_path}/cropped.ply"
+        meshes_cropped['stereo'] = f"{meshes_path}/cropped_st.vtk"
+        meshes_cropped['cart'] = f"{meshes_path}/cropped.vtk"
 
         crop_mesh(dem_mask, meshes, mask=dem_mask, meshes_cropped=meshes_cropped)
 
@@ -203,7 +208,7 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
     ds['y'] = ds.y * 1e3
     dsi = ds.interpolate_na(dim="x").interpolate_na(dim="y")
 
-    return dsi, epo_utc
+    return dsi, date_illum_str
 
 
 def irradiance_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_mask=None, source='SUN',
@@ -229,7 +234,7 @@ def irradiance_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, de
         logging.error("* Either set return_irradiance=True, or else call render_at_date.")
 
     return render_at_date(meshes, epo_utc, path_to_furnsh, center, crs, dem_mask, source, inc_flux, basemesh_path, show,
-                          point, return_irradiance)
+                          point, azi_ele_deg=None, return_irradiance=return_irradiance)
 
 
 def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
@@ -257,19 +262,13 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
     meas = xr.load_dataarray(meas_path)
     meas = meas.where(meas >= 0)
 
-    ############# simulate smaller image
-    # import shapely
-    # geometries = shapely.box(67400, 121800, 68400, 122200)
-    # meas = meas.rio.clip([geometries])
-    #############
-
     # raster outer shape to polygon
     ds = (meas.coarsen(x=1, boundary="trim").mean(skipna=True).
           coarsen(y=1, boundary="trim").mean(skipna=True))
     df = ds.to_dataframe().reset_index().loc[:, ['x', 'y']] * 1e-3
     meas_outer_poly = gpd.GeoDataFrame(geometry=gpd.points_from_xy(df.x, df.y))
     meas_outer_poly = meas_outer_poly.dropna(axis=0).dissolve().convex_hull
-    meas_outer_poly = gpd.GeoDataFrame({'geometry': meas_outer_poly.buffer(50, join_style=2)})
+    meas_outer_poly = gpd.GeoDataFrame({'geometry': meas_outer_poly.buffer(0.05, join_style=2)})
 
     # get full rendering at date
     dsi, date_illum_str = render_at_date(meshes, epo_utc, path_to_furnsh, center=center, crs=meas.rio.crs,
@@ -279,9 +278,26 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
     rendering = dsi.rio.reproject_match(meas, Resampling=Resampling.bilinear,
                                         nodata=np.nan)
 
-    # apply "exposure factor" (median of ratio) to rendered image
+    # TODO make the threshold an adjustable parameter
+    mask = meas.sel({'band': 1}) > 0.005
+
+    # # apply "exposure factor" (median of ratio) to rendered image
     exposure_factor = rendering.flux.values / meas.sel({'band': 1}).values
-    exposure_factor = np.median(exposure_factor.ravel()[~np.isnan(exposure_factor.ravel())])
+    # plt.imshow(np.log10(exposure_factor), vmax=1, vmin=-1)
+    # plt.colorbar()
+    # plt.show()
+
+    exposure_factor = exposure_factor[mask]
+    # print(np.min(exposure_factor), np.max(exposure_factor), np.mean(exposure_factor),
+    #       np.median(exposure_factor), np.std(exposure_factor))
+    #
+    # fig, ax = plt.subplots()
+    # ax.hist(rendering.flux.values.ravel(), bins=100, range=[0.001,0.05], label='rendering')
+    # ax.hist(meas.sel({'band': 1}).values.ravel(), bins=100, range=[0.001,0.05], label='NAC')
+    # plt.legend()
+    # plt.show()
+
+    exposure_factor = np.median(exposure_factor) #.ravel()[~np.isnan(exposure_factor.ravel())])
 
     if exposure_factor > 0:
         rendering /= exposure_factor
@@ -294,15 +310,6 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
     # save simulated image to raster
     outraster = f"{outdir}{img_name}_{date_illum_str}.tif"
     rendering.transpose('y', 'x').rio.to_raster(outraster)
-
-    #####
-    dsi.transpose('y', 'x').rio.to_raster(outraster) # full DEM region
-    rendering.flux.plot(robust=True)
-    plt.show()
-    meas.plot(robust=True)
-    plt.show()
-    # rendering.rio.to_raster(outraster)
-    #####
 
     print(f"- Flux for {img_name} saved to {outraster} (xy resolution = {rendering.rio.resolution()}mpp).")
 

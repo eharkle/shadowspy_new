@@ -5,8 +5,8 @@ import meshio
 import numpy as np
 import rioxarray as rio
 
-from coord_tools import unproject_stereographic, sph2cart
-from mesh_tools import get_uniform_triangle_mesh
+from shadowspy.coord_tools import unproject_stereographic, sph2cart
+from mesh_operations.mesh_tools import get_uniform_triangle_mesh
 
 
 def generate_square_with_hole_vertices(outer_square_size=10, hole_size=2, spacing=1):

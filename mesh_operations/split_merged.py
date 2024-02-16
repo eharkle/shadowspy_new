@@ -1,7 +1,7 @@
 import meshio
 import numpy as np
 
-from coord_tools import unproject_stereographic, sph2cart
+from shadowspy.coord_tools import unproject_stereographic, sph2cart
 from mesh_operations import load_mesh
 
 

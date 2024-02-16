@@ -7,8 +7,8 @@ import pandas as pd
 import geopandas as gpd
 
 from shadowspy.coord_tools import cart2sph, azimuth_elevation_to_cartesian
-from mesh_utils import import_mesh
-from mesh_tools import crop_mesh
+from mesh_operations.mesh_utils import import_mesh
+from mesh_operations.mesh_tools import crop_mesh
 from shadowspy.spice_util import get_sourcevec
 from shadowspy.shape import CgalTrimeshShapeModel  # , EmbreeTrimeshShapeModel
 import xarray as xr

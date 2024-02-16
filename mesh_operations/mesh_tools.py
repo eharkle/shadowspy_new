@@ -1,7 +1,7 @@
 import meshio
 import numpy as np
 
-from mesh_utils import import_mesh
+from mesh_operations.mesh_utils import import_mesh
 from shadowspy.shape import get_centroids
 
 
