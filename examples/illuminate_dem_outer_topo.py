@@ -22,6 +22,7 @@ if __name__ == '__main__':
     Fsun = 1361  # W/m2
     Rb = 1737.4 # km
     base_resolution = 10
+    max_extension = 300e3
     root = "examples/"
     os.makedirs(root, exist_ok=True)
 
@@ -30,7 +31,7 @@ if __name__ == '__main__':
 
     # Elevation/DEM GTiff input
     indir = f"{root}aux/"
-    tif_path = f"{indir}IM05_GLDELEV_001.tif"
+    tif_path = f"{indir}IM1_Terry.tif"
     meshpath = tif_path.split('.')[0]
     fartopo_path = f"{indir}LDEM_80S_80MPP_ADJ.TIF" # f"{indir}IM1_ldem_large.tif"
     fartopomesh = fartopo_path.split('.')[0]
@@ -42,12 +43,11 @@ if __name__ == '__main__':
     bounds = da.rio.bounds()
     demcx, demcy = np.mean([bounds[0], bounds[2]]), np.mean([bounds[1], bounds[3]])
 
-    da = xr.load_dataarray(fartopo_path)
-    da = da.rio.clip_box(minx=demcx-50e3, miny=demcy-50e3,
-                         maxx=demcx+50e3, maxy=demcy+50e3)
-    fartopo_path = f"{indir}LDEM_50KM_80M.tif"
-    fartopomesh = fartopo_path.split('.')[0]
-    da.rio.to_raster(fartopo_path)
+    # da = da.rio.clip_box(minx=demcx-300e3, miny=demcy-300e3,
+    #                      maxx=demcx+300e3, maxy=demcy+300e3)
+    # fartopo_path = f"{indir}LDEM_50KM_80M.tif"
+    # fartopomesh = fartopo_path.split('.')[0]
+    # da.rio.to_raster(fartopo_path)
 
     # prepare mesh of the input dem
     start = time.time()
@@ -60,11 +60,21 @@ if __name__ == '__main__':
     shutil.move(f"{root}b{base_resolution}_dn1_st{ext}", f"{meshpath}_st{ext}")
 
     start = time.time()
+    da_out = xr.load_dataarray(fartopo_path)
+    min_resolution = da_out.rio.resolution()[0]
     # Merge inner and outer meshes seamlessly
+    # set a couple of layers at 1, 5 and max_extension km ranges
     outer_topos = []
-    outer_topos.append({40: f"{indir}IM1_ldem_large.tif"})
-    outer_topos.append({240: fartopo_path})
-    print(outer_topos)
+    extres = {20e3: 20, 60e3: 60, 100e3: 120, 150e3: 240, 300e3: 480}
+    extres = {ext: max(res, min_resolution) for ext, res in extres.items()
+              if ext < max_extension}
+    for extension, resol in extres.items():
+        da_red = da_out.rio.clip_box(minx=demcx-extension, miny=demcy-extension,
+                             maxx=demcx+extension, maxy=demcy+extension)
+        fartopo_path = f"{indir}LDEM_{extension}KM_outer.tif"
+        fartopomesh = fartopo_path.split('.')[0]
+        da_red.rio.to_raster(fartopo_path)
+        outer_topos.append({resol: f"{indir}LDEM_{extension}KM_outer.tif"})
 
     # for iter 0, set inner mesh as stacked mesh
     shutil.copy(f"{meshpath}_st{ext}", f"{indir}stacked_st{ext}")
