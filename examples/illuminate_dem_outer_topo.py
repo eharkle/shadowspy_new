@@ -1,9 +1,10 @@
 import os
 import shutil
 import time
-from datetime import datetime
+from datetime import datetime, date
 
 import matplotlib.pyplot as plt
+import pandas as pd
 from rasterio._io import Resampling
 from tqdm import tqdm
 import xarray as xr
@@ -20,8 +21,8 @@ if __name__ == '__main__':
     # compute direct flux from the Sun
     Fsun = 1361  # W/m2
     Rb = 1737.4 # km
-    base_resolution = 2
-    max_extension = 300e3
+    base_resolution = 10
+    max_extension = 50e3
     root = "examples/"
     os.makedirs(root, exist_ok=True)
 
@@ -30,31 +31,25 @@ if __name__ == '__main__':
 
     # Elevation/DEM GTiff input
     indir = f"{root}aux/"
-    tif_path = f"{indir}IM1_TerryR.tif"
-    meshpath = tif_path.split('.')[0]
-    # fartopo_path = f"{indir}LDEM_80S_80MPP_ADJ.TIF" # f"{indir}IM1_ldem_large.tif"
-    fartopo_path = "/explore/nobackup/people/mkbarker/GCD/grid/20mpp/v4/public/final/LDEM_80S_20MPP_ADJ.TIF"
-    fartopomesh = fartopo_path.split('.')[0]
-    ext = '.vtk'
-
     experiment = 'IM1'
     outdir = f"{root}out/"
     os.makedirs(outdir, exist_ok=True)
     tmpdir = f"{root}tmp/"
     os.makedirs(tmpdir, exist_ok=True)
-    
+
+    tif_path = f"{indir}IM1_TerryR.tif"
+    meshpath = f"{tmpdir}{tif_path.split('/')[-1].split('.')[0]}"
+    fartopo_path = f"{indir}LDEM_80S_80MPP_ADJ.TIF" # f"{indir}IM1_ldem_large.tif"
+    # fartopo_path = "/explore/nobackup/people/mkbarker/GCD/grid/20mpp/v4/public/final/LDEM_80S_20MPP_ADJ.TIF"
+    fartopomesh = fartopo_path.split('.')[0]
+    ext = '.vtk'
+
     # crop fartopo to box around dem to render
     import numpy as np
     da = xr.load_dataarray(tif_path)
     print(da)
     bounds = da.rio.bounds()
     demcx, demcy = np.mean([bounds[0], bounds[2]]), np.mean([bounds[1], bounds[3]])
-
-    # da = da.rio.clip_box(minx=demcx-300e3, miny=demcy-300e3,
-    #                      maxx=demcx+300e3, maxy=demcy+300e3)
-    # fartopo_path = f"{indir}LDEM_50KM_80M.tif"
-    # fartopomesh = fartopo_path.split('.')[0]
-    # da.rio.to_raster(fartopo_path)
 
     # prepare mesh of the input dem
     start = time.time()
@@ -79,10 +74,10 @@ if __name__ == '__main__':
     for extension, resol in tqdm(extres.items(), total=len(list(extres.keys())), desc='crop_outer'):
         da_red = da_out.rio.clip_box(minx=demcx-extension, miny=demcy-extension,
                              maxx=demcx+extension, maxy=demcy+extension)
-        fartopo_path = f"{tmpdir}LDEM_{extension}KM_outer.tif"
+        fartopo_path = f"{tmpdir}LDEM_{int(round(extension,0))}M_outer.tif"
         fartopomesh = fartopo_path.split('.')[0]
         da_red.rio.to_raster(fartopo_path)
-        outer_topos.append({resol: f"{tmpdir}LDEM_{extension}KM_outer.tif"})
+        outer_topos.append({resol: f"{tmpdir}LDEM_{int(round(extension,0))}M_outer.tif"})
 
     # for iter 0, set inner mesh as stacked mesh
     shutil.copy(f"{meshpath}_st{ext}", f"{tmpdir}stacked_st{ext}")
@@ -114,11 +109,18 @@ if __name__ == '__main__':
     # Split inner and outer meshes
     len_inner_faces = labels_dict_list[0]['inner']
     inner_mesh_path, outer_mesh_path = split_merged(input_totalmesh, len_inner_faces, meshpath, fartopomesh, ext, Rb)
+    print(inner_mesh_path, outer_mesh_path)
     print(f"- Inner+outer meshes generated from merged after {round(time.time() - start, 2)} seconds.")
     #####
 
     # get list of images from mapprojected folder
-    epos_utc = ['2024-02-22 23:24:00.0'] # '2023-09-15 06:00:00.0']
+    epos_utc = ['2024-02-22 23:24:00.0']
+    # start_time = datetime(2024, 2, 1, 23, 24, 00)
+    # end_time = datetime(2024, 2, 29, 23, 24, 00)
+    # time_step_hours = 24
+    # s = pd.Series(pd.date_range(start_time, end_time, freq=f'{time_step_hours}H')
+    #               .strftime('%Y-%m-%d %H:%M:%S.%f'))
+    # epos_utc = s.values.tolist()
     print(f"- Rendering input DEM at {epos_utc} on {len_inner_faces} triangles.")
 
     dem = xr.load_dataarray(tif_path)
