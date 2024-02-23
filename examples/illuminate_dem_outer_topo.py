@@ -20,8 +20,8 @@ if __name__ == '__main__':
     # compute direct flux from the Sun
     Fsun = 1361  # W/m2
     Rb = 1737.4 # km
-    base_resolution = 5
-    max_extension = 70e3
+    base_resolution = 2
+    max_extension = 300e3
     root = "examples/"
     os.makedirs(root, exist_ok=True)
 
@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
     # Elevation/DEM GTiff input
     indir = f"{root}aux/"
-    tif_path = f"{indir}IM1_Terry.tif"
+    tif_path = f"{indir}IM1_TerryR.tif"
     meshpath = tif_path.split('.')[0]
     # fartopo_path = f"{indir}LDEM_80S_80MPP_ADJ.TIF" # f"{indir}IM1_ldem_large.tif"
     fartopo_path = "/explore/nobackup/people/mkbarker/GCD/grid/20mpp/v4/public/final/LDEM_80S_20MPP_ADJ.TIF"
@@ -40,7 +40,9 @@ if __name__ == '__main__':
     experiment = 'IM1'
     outdir = f"{root}out/"
     os.makedirs(outdir, exist_ok=True)
-
+    tmpdir = f"{root}tmp/"
+    os.makedirs(tmpdir, exist_ok=True)
+    
     # crop fartopo to box around dem to render
     import numpy as np
     da = xr.load_dataarray(tif_path)
@@ -74,18 +76,18 @@ if __name__ == '__main__':
     extres = {20e3: 20, 60e3: 60, 100e3: 120, 150e3: 240, 300e3: 480}
     extres = {ext: max(res, min_resolution) for ext, res in extres.items()
               if ext < max_extension}
-    for extension, resol in extres.items():
+    for extension, resol in tqdm(extres.items(), total=len(list(extres.keys())), desc='crop_outer'):
         da_red = da_out.rio.clip_box(minx=demcx-extension, miny=demcy-extension,
                              maxx=demcx+extension, maxy=demcy+extension)
-        fartopo_path = f"{indir}LDEM_{extension}KM_outer.tif"
+        fartopo_path = f"{tmpdir}LDEM_{extension}KM_outer.tif"
         fartopomesh = fartopo_path.split('.')[0]
         da_red.rio.to_raster(fartopo_path)
-        outer_topos.append({resol: f"{indir}LDEM_{extension}KM_outer.tif"})
+        outer_topos.append({resol: f"{tmpdir}LDEM_{extension}KM_outer.tif"})
 
     # for iter 0, set inner mesh as stacked mesh
-    shutil.copy(f"{meshpath}_st{ext}", f"{indir}stacked_st{ext}")
+    shutil.copy(f"{meshpath}_st{ext}", f"{tmpdir}stacked_st{ext}")
     labels_dict_list = {}
-    for idx, resol_dempath in enumerate(outer_topos):
+    for idx, resol_dempath in tqdm(enumerate(outer_topos), total=len(outer_topos), desc='stack_meshes'):
         resol = list(resol_dempath.keys())[0]
         dempath = list(resol_dempath.values())[0]
 
@@ -96,14 +98,14 @@ if __name__ == '__main__':
         print(f"- Adding {fartopo_path} ({fartopomesh}) at {outer_mesh_resolution}mpp.")
 
         # ... and outer topography
-        mesh_generation.make(outer_mesh_resolution, [1], fartopo_path, out_path=root, mesh_ext=ext,
+        mesh_generation.make(outer_mesh_resolution, [1], fartopo_path, out_path=tmpdir, mesh_ext=ext,
                              rescale_fact=1e-3, lonlat0=(0, -90))
-        shutil.move(f"{root}b{outer_mesh_resolution}_dn1_st{ext}", f"{fartopomesh}_st{ext}")
+        shutil.move(f"{tmpdir}b{outer_mesh_resolution}_dn1_st{ext}", f"{tmpdir}{fartopomesh.split('/')[-1]}_st{ext}")
         print(f"- Meshes generated after {round(time.time() - start, 2)} seconds.")
 
-        stacked_mesh_path = f"{indir}stacked_st{ext}"
+        stacked_mesh_path = f"{tmpdir}stacked_st{ext}"
         input_totalmesh, labels_dict = merge_inout(load_mesh(stacked_mesh_path),
-                                                   load_mesh(f"{fartopomesh}_st{ext}"),
+                                                   load_mesh(f"{tmpdir}{fartopomesh.split('/')[-1]}_st{ext}"),
                                                    output_path=stacked_mesh_path) #, debug=True)
         labels_dict_list[idx] = labels_dict
         print(f"- Meshes merged after {round(time.time() - start, 2)} seconds and saved to {stacked_mesh_path}.")
