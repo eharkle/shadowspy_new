@@ -1,6 +1,7 @@
 import os
 import shutil
 import time
+from datetime import datetime
 
 import matplotlib.pyplot as plt
 from rasterio._io import Resampling
@@ -9,18 +10,18 @@ import xarray as xr
 import rioxarray
 
 from examples.download_kernels import download_kernels
-from mesh_operations import load_mesh, mesh_generation, split_merged
+from mesh_operations import load_mesh, mesh_generation
 from mesh_operations.merge_overlapping import merge_inout
-from shadowspy.render_dem import render_at_date
-
+from shadowspy.render_dem import render_at_date, irradiance_at_date
+from mesh_operations.split_merged import split_merged
 
 if __name__ == '__main__':
 
     # compute direct flux from the Sun
     Fsun = 1361  # W/m2
     Rb = 1737.4 # km
-    base_resolution = 2
-    max_extension = 300e3
+    base_resolution = 10
+    max_extension = 50e3
     root = "examples/"
     os.makedirs(root, exist_ok=True)
 
@@ -31,17 +32,19 @@ if __name__ == '__main__':
     indir = f"{root}aux/"
     tif_path = f"{indir}IM1_Terry.tif"
     meshpath = tif_path.split('.')[0]
-    #fartopo_path = f"{indir}LDEM_80S_80MPP_ADJ.TIF" # f"{indir}IM1_ldem_large.tif"
-    fartopo_path = "/explore/nobackup/people/mkbarker/GCD/grid/20mpp/v4/public/final/LDEM_80S_20MPP_ADJ.TIF"
+    fartopo_path = f"{indir}LDEM_80S_80MPP_ADJ.TIF" # f"{indir}IM1_ldem_large.tif"
+    # fartopo_path = "/explore/nobackup/people/mkbarker/GCD/grid/20mpp/v4/public/final/LDEM_80S_20MPP_ADJ.TIF"
     fartopomesh = fartopo_path.split('.')[0]
     ext = '.vtk'
 
     experiment = 'IM1'
     outdir = f"{root}out/"
-    
+    os.makedirs(outdir, exist_ok=True)
+
     # crop fartopo to box around dem to render
     import numpy as np
     da = xr.load_dataarray(tif_path)
+    print(da)
     bounds = da.rio.bounds()
     demcx, demcy = np.mean([bounds[0], bounds[2]]), np.mean([bounds[1], bounds[3]])
 
@@ -57,13 +60,14 @@ if __name__ == '__main__':
 
     # Generate uniform meshes for inner...
     mesh_generation.make(base_resolution, [1], tif_path, out_path=root, mesh_ext=ext,
-                         rescale_fact=1)
+                         rescale_fact=1e-3, lonlat0=(0, -90))
     shutil.move(f"{root}b{base_resolution}_dn1{ext}", f"{meshpath}{ext}")
     shutil.move(f"{root}b{base_resolution}_dn1_st{ext}", f"{meshpath}_st{ext}")
 
     start = time.time()
     da_out = xr.load_dataarray(fartopo_path)
-    min_resolution = da_out.rio.resolution()[0]
+    print(da_out)
+    min_resolution = int(round(da_out.rio.resolution()[0],0))
     # Merge inner and outer meshes seamlessly
     # set a couple of layers at 1, 5 and max_extension km ranges
     outer_topos = []
@@ -93,7 +97,7 @@ if __name__ == '__main__':
 
         # ... and outer topography
         mesh_generation.make(outer_mesh_resolution, [1], fartopo_path, out_path=root, mesh_ext=ext,
-                             rescale_fact=1)
+                             rescale_fact=1e-3, lonlat0=(0, -90))
         shutil.move(f"{root}b{outer_mesh_resolution}_dn1_st{ext}", f"{fartopomesh}_st{ext}")
         print(f"- Meshes generated after {round(time.time() - start, 2)} seconds.")
 
@@ -121,31 +125,31 @@ if __name__ == '__main__':
     for epo_in in tqdm(epos_utc, total=len(epos_utc)):
 
         # plot with inner topo only
-        #dsi, epo_out = render_at_date(meshes={'stereo': f"{inner_mesh_path}_st{ext}", 'cart': f"{inner_mesh_path}{ext}"},
-        #                              epo_utc=epo_in, path_to_furnsh=f"{indir}simple.furnsh",
-        #                              show=False, point=True)
+        dsi, epo_out = irradiance_at_date(meshes={'stereo': f"{inner_mesh_path}_st{ext}", 'cart': f"{inner_mesh_path}{ext}"},
+                                            path_to_furnsh=f"{indir}simple.furnsh", epo_utc=epo_in,
+                                          point=True, source='SUN', inc_flux=Fsun)
 
         # plot with inner+outer topo
-        dsi_far, epo_out = render_at_date(meshes={'stereo': f"{inner_mesh_path}_st{ext}", 'cart': f"{inner_mesh_path}{ext}"},
-                                      epo_utc=epo_in, path_to_furnsh=f"{indir}simple.furnsh",
-                                      basemesh_path=f"{outer_mesh_path}{ext}",
-                                      show=False, point=True)
-        
-        epostr = datetime.datetime.strptime(epo_in,'%Y-%m-%d %H:%M:%S.%f')
+        dsi_far, epo_out = irradiance_at_date(meshes={'stereo': f"{inner_mesh_path}_st{ext}", 'cart': f"{inner_mesh_path}{ext}"},
+                                          epo_utc=epo_in, path_to_furnsh=f"{indir}simple.furnsh",
+                                          basemesh_path=f"{outer_mesh_path}{ext}",
+                                          point=True, source='SUN', inc_flux=Fsun)
+
+        epostr = datetime.strptime(epo_in,'%Y-%m-%d %H:%M:%S.%f')
         epostr = epostr.strftime('%y%m%d%H%M%S')
-        
-        fig, axes = plt.subplots(1, 1, sharex=False, sharey=False, figsize=(10, 10) )
+
+        fig, axes = plt.subplots(1, 2, sharex=False, sharey=False, figsize=(15, 5) )
 
         # rearrange axes, match dem, and save
-        #dsi['x'] = dsi['x']*1e-3
-        #dsi['y'] = dsi['y']*1e-3
-        #dsi.rio.write_crs(demcrs, inplace=True)
-        #dsi.rio.reproject_match(dem, resampling=Resampling.bilinear, inplace=True)
-        #dsi.flux.rio.to_raster(f"{meshpath}_dsi.tif")
+        dsi['x'] = dsi['x']*1e-3
+        dsi['y'] = dsi['y']*1e-3
+        dsi.rio.write_crs(demcrs, inplace=True)
+        dsi.rio.reproject_match(dem, resampling=Resampling.bilinear, inplace=True)
+        dsi.flux.rio.to_raster(f"{meshpath}_dsi.tif")
 
         # plot
-        #dsi.flux.plot(robust=True, ax=axes[0])
-        #axes[0].set_title('New inner mesh only')
+        dsi.flux.plot(robust=True, ax=axes[0])
+        axes[0].set_title('New inner mesh only')
 
         # rearrange axes, match dem, and save
         dsi_far['x'] = dsi_far['x']*1e-3
@@ -155,8 +159,8 @@ if __name__ == '__main__':
         dsi_far.flux.rio.to_raster(f"{outdir}{experiment}_GLDSFLX_001_{epostr}_000.tif")
 
         # plot
-        dsi_far.flux.plot(robust=True, ax=axes)
-        #axes[1].set_title('New inner mesh + ldem merged')
+        dsi_far.flux.plot(robust=True, ax=axes[1])
+        axes[1].set_title('New inner mesh + ldem merged')
 
         plt.savefig(f"{outdir}{experiment}_GLDSFLX_001_{epostr}_000.png")
         plt.show()

@@ -75,7 +75,7 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN
     if azi_ele_deg == None:
         point_source_vecs = get_sourcevec(utc0=utc0, stepet=1, et_linspace=np.linspace(0, 1, 1),
                                    path_to_furnsh=path_to_furnsh,
-                                   target=source, frame='MOON_ME', observer='MOON')
+                                   target=source, frame='MOON_ME', observer='MOON')#*1e3
     else:
         latitude_deg, longitude_deg = np.rad2deg(np.vstack(cart2sph(np.mean(C, axis=0)))[1:])
         logging.warning("- Using source_distance = 1.5e8 km ~ 1AU. Adapt for other bodies.")
