@@ -8,12 +8,10 @@ from tqdm import tqdm
 import xarray as xr
 import rioxarray
 
-import mesh_generation
 from examples.download_kernels import download_kernels
-from mesh_operations import load_mesh
+from mesh_operations import load_mesh, mesh_generation, split_merged
 from mesh_operations.merge_overlapping import merge_inout
 from shadowspy.render_dem import render_at_date
-from split_merged import split_merged
 
 
 if __name__ == '__main__':
@@ -21,7 +19,7 @@ if __name__ == '__main__':
     # compute direct flux from the Sun
     Fsun = 1361  # W/m2
     Rb = 1737.4 # km
-    base_resolution = 10
+    base_resolution = 2
     max_extension = 300e3
     root = "examples/"
     os.makedirs(root, exist_ok=True)
@@ -33,10 +31,14 @@ if __name__ == '__main__':
     indir = f"{root}aux/"
     tif_path = f"{indir}IM1_Terry.tif"
     meshpath = tif_path.split('.')[0]
-    fartopo_path = f"{indir}LDEM_80S_80MPP_ADJ.TIF" # f"{indir}IM1_ldem_large.tif"
+    #fartopo_path = f"{indir}LDEM_80S_80MPP_ADJ.TIF" # f"{indir}IM1_ldem_large.tif"
+    fartopo_path = "/explore/nobackup/people/mkbarker/GCD/grid/20mpp/v4/public/final/LDEM_80S_20MPP_ADJ.TIF"
     fartopomesh = fartopo_path.split('.')[0]
     ext = '.vtk'
 
+    experiment = 'IM1'
+    outdir = f"{root}out/"
+    
     # crop fartopo to box around dem to render
     import numpy as np
     da = xr.load_dataarray(tif_path)
@@ -110,7 +112,7 @@ if __name__ == '__main__':
     #####
 
     # get list of images from mapprojected folder
-    epos_utc = ['2023-09-15 06:00:00.0']
+    epos_utc = ['2024-02-22 23:24:00.0'] # '2023-09-15 06:00:00.0']
     print(f"- Rendering input DEM at {epos_utc} on {len_inner_faces} triangles.")
 
     dem = xr.load_dataarray(tif_path)
@@ -119,39 +121,42 @@ if __name__ == '__main__':
     for epo_in in tqdm(epos_utc, total=len(epos_utc)):
 
         # plot with inner topo only
-        dsi, epo_out = render_at_date(meshes={'stereo': f"{inner_mesh_path}_st{ext}", 'cart': f"{inner_mesh_path}{ext}"},
-                                      epo_utc=epo_in, path_to_furnsh=f"{indir}simple.furnsh",
-                                      show=False, point=True)
+        #dsi, epo_out = render_at_date(meshes={'stereo': f"{inner_mesh_path}_st{ext}", 'cart': f"{inner_mesh_path}{ext}"},
+        #                              epo_utc=epo_in, path_to_furnsh=f"{indir}simple.furnsh",
+        #                              show=False, point=True)
 
         # plot with inner+outer topo
         dsi_far, epo_out = render_at_date(meshes={'stereo': f"{inner_mesh_path}_st{ext}", 'cart': f"{inner_mesh_path}{ext}"},
                                       epo_utc=epo_in, path_to_furnsh=f"{indir}simple.furnsh",
                                       basemesh_path=f"{outer_mesh_path}{ext}",
                                       show=False, point=True)
-
-        fig, axes = plt.subplots(1, 2, sharex=False, sharey=False, figsize=(15, 5) )
+        
+        epostr = datetime.datetime.strptime(epo_in,'%Y-%m-%d %H:%M:%S.%f')
+        epostr = epostr.strftime('%y%m%d%H%M%S')
+        
+        fig, axes = plt.subplots(1, 1, sharex=False, sharey=False, figsize=(10, 10) )
 
         # rearrange axes, match dem, and save
-        dsi['x'] = dsi['x']*1e-3
-        dsi['y'] = dsi['y']*1e-3
-        dsi.rio.write_crs(demcrs, inplace=True)
-        dsi.rio.reproject_match(dem, resampling=Resampling.bilinear, inplace=True)
-        dsi.flux.rio.to_raster(f"{meshpath}_dsi.tif")
+        #dsi['x'] = dsi['x']*1e-3
+        #dsi['y'] = dsi['y']*1e-3
+        #dsi.rio.write_crs(demcrs, inplace=True)
+        #dsi.rio.reproject_match(dem, resampling=Resampling.bilinear, inplace=True)
+        #dsi.flux.rio.to_raster(f"{meshpath}_dsi.tif")
 
         # plot
-        dsi.flux.plot(robust=True, ax=axes[0])
-        axes[0].set_title('New inner mesh only')
+        #dsi.flux.plot(robust=True, ax=axes[0])
+        #axes[0].set_title('New inner mesh only')
 
         # rearrange axes, match dem, and save
         dsi_far['x'] = dsi_far['x']*1e-3
         dsi_far['y'] = dsi_far['y']*1e-3
         dsi_far.rio.write_crs(demcrs, inplace=True)
         dsi_far.rio.reproject_match(dem, resampling=Resampling.bilinear, inplace=True)
-        dsi_far.flux.rio.to_raster(f"{meshpath}_dsifar.tif")
+        dsi_far.flux.rio.to_raster(f"{outdir}{experiment}_GLDSFLX_001_{epostr}_000.tif")
 
         # plot
-        dsi_far.flux.plot(robust=True, ax=axes[1])
-        axes[1].set_title('New inner mesh + ldem merged')
+        dsi_far.flux.plot(robust=True, ax=axes)
+        #axes[1].set_title('New inner mesh + ldem merged')
 
-        plt.savefig(f"{indir}renderings.png")
+        plt.savefig(f"{outdir}{experiment}_GLDSFLX_001_{epostr}_000.png")
         plt.show()
