@@ -20,8 +20,8 @@ if __name__ == '__main__':
     # compute direct flux from the Sun
     Fsun = 1361  # W/m2
     Rb = 1737.4 # km
-    base_resolution = 10
-    max_extension = 50e3
+    base_resolution = 5
+    max_extension = 70e3
     root = "examples/"
     os.makedirs(root, exist_ok=True)
 
@@ -32,8 +32,8 @@ if __name__ == '__main__':
     indir = f"{root}aux/"
     tif_path = f"{indir}IM1_Terry.tif"
     meshpath = tif_path.split('.')[0]
-    fartopo_path = f"{indir}LDEM_80S_80MPP_ADJ.TIF" # f"{indir}IM1_ldem_large.tif"
-    # fartopo_path = "/explore/nobackup/people/mkbarker/GCD/grid/20mpp/v4/public/final/LDEM_80S_20MPP_ADJ.TIF"
+    # fartopo_path = f"{indir}LDEM_80S_80MPP_ADJ.TIF" # f"{indir}IM1_ldem_large.tif"
+    fartopo_path = "/explore/nobackup/people/mkbarker/GCD/grid/20mpp/v4/public/final/LDEM_80S_20MPP_ADJ.TIF"
     fartopomesh = fartopo_path.split('.')[0]
     ext = '.vtk'
 
@@ -66,8 +66,8 @@ if __name__ == '__main__':
 
     start = time.time()
     da_out = xr.load_dataarray(fartopo_path)
-    print(da_out)
     min_resolution = int(round(da_out.rio.resolution()[0],0))
+
     # Merge inner and outer meshes seamlessly
     # set a couple of layers at 1, 5 and max_extension km ranges
     outer_topos = []
