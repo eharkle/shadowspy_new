@@ -141,8 +141,8 @@ if __name__ == '__main__':
         fig, axes = plt.subplots(1, 2, sharex=False, sharey=False, figsize=(15, 5) )
 
         # rearrange axes, match dem, and save
-        dsi['x'] = dsi['x']*1e-3
-        dsi['y'] = dsi['y']*1e-3
+        dsi['x'] = dsi['x']#*1e-3
+        dsi['y'] = dsi['y']#*1e-3
         dsi.rio.write_crs(demcrs, inplace=True)
         dsi.rio.reproject_match(dem, resampling=Resampling.bilinear, inplace=True)
         dsi.flux.rio.to_raster(f"{meshpath}_dsi.tif")
@@ -152,10 +152,12 @@ if __name__ == '__main__':
         axes[0].set_title('New inner mesh only')
 
         # rearrange axes, match dem, and save
-        dsi_far['x'] = dsi_far['x']*1e-3
-        dsi_far['y'] = dsi_far['y']*1e-3
+        dsi_far['x'] = dsi_far['x']#*1e-3
+        dsi_far['y'] = dsi_far['y']#*1e-3
         dsi_far.rio.write_crs(demcrs, inplace=True)
+        target_resolution = int(round(dem.rio.resolution()[0],0))
         dsi_far.rio.reproject_match(dem, resampling=Resampling.bilinear, inplace=True)
+        dsi_far = dsi_far.rio.reproject(dsi_far.rio.crs, resolution=target_resolution, resampling=Resampling.bilinear)
         dsi_far.flux.rio.to_raster(f"{outdir}{experiment}_GLDSFLX_001_{epostr}_000.tif")
 
         # plot
