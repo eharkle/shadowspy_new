@@ -81,11 +81,14 @@ def make(base_resolution, decimation_rates, tif_path, out_path, mesh_ext='.xmf',
          plarad=1737.4, lonlat0=(0, -90), rescale_fact=1.e-3):
 
     rds = rio.open_rasterio(tif_path)
-    tiff_resolution = int(rds.rio.resolution()[0])
+    tiff_resolution = int(round(rds.rio.resolution()[0], 0))
 
-    # print(abs(rds.rio.resolution()[0]), abs(rds.rio.resolution()[1]))
-    assert abs(abs(rds.rio.resolution()[0]) - abs(rds.rio.resolution()[1])) < 1.e-16
-
+    try:
+        assert abs(abs(rds.rio.resolution()[0]) - abs(rds.rio.resolution()[1])) < 1.e-12
+    except:
+        logging.error(f"* Mesh pixes are not square. dx-dy={abs(abs(rds.rio.resolution()[0]) - abs(rds.rio.resolution()[1]))}.")
+        exit()
+        
     # if the required dn1 (base resolution) is larger than the native GTiff one, decimate the input
     if base_resolution == tiff_resolution:
         # xgrid = rds.coords['y'].values*-1.e-3
