@@ -21,8 +21,8 @@ if __name__ == '__main__':
     # compute direct flux from the Sun
     Fsun = 1361  # W/m2
     Rb = 1737.4 # km
-    base_resolution = 10
-    max_extension = 50e3
+    base_resolution = 2
+    max_extension = 300e3
     root = "examples/"
     os.makedirs(root, exist_ok=True)
 
@@ -32,15 +32,15 @@ if __name__ == '__main__':
     # Elevation/DEM GTiff input
     indir = f"{root}aux/"
     experiment = 'IM1'
-    outdir = f"{root}out/"
+    outdir = f"{root}outR/"
     os.makedirs(outdir, exist_ok=True)
     tmpdir = f"{root}tmp/"
     os.makedirs(tmpdir, exist_ok=True)
 
     tif_path = f"{indir}IM1_TerryR.tif"
     meshpath = f"{tmpdir}{tif_path.split('/')[-1].split('.')[0]}"
-    fartopo_path = f"{indir}LDEM_80S_80MPP_ADJ.TIF" # f"{indir}IM1_ldem_large.tif"
-    # fartopo_path = "/explore/nobackup/people/mkbarker/GCD/grid/20mpp/v4/public/final/LDEM_80S_20MPP_ADJ.TIF"
+    # fartopo_path = f"{indir}LDEM_80S_80MPP_ADJ.TIF" # f"{indir}IM1_ldem_large.tif"
+    fartopo_path = "/explore/nobackup/people/mkbarker/GCD/grid/20mpp/v4/public/final/LDEM_80S_20MPP_ADJ.TIF"
     fartopomesh = fartopo_path.split('.')[0]
     ext = '.vtk'
 
@@ -56,10 +56,10 @@ if __name__ == '__main__':
     print(f"- Computing trimesh for {tif_path}...")
 
     # Generate uniform meshes for inner...
-    mesh_generation.make(base_resolution, [1], tif_path, out_path=root, mesh_ext=ext,
+    mesh_generation.make(base_resolution, [1], tif_path, out_path=tmpdir, mesh_ext=ext,
                          rescale_fact=1e-3, lonlat0=(0, -90))
-    shutil.move(f"{root}b{base_resolution}_dn1{ext}", f"{meshpath}{ext}")
-    shutil.move(f"{root}b{base_resolution}_dn1_st{ext}", f"{meshpath}_st{ext}")
+    shutil.move(f"{tmpdir}b{base_resolution}_dn1{ext}", f"{meshpath}{ext}")
+    shutil.move(f"{tmpdir}b{base_resolution}_dn1_st{ext}", f"{meshpath}_st{ext}")
 
     start = time.time()
     da_out = xr.load_dataarray(fartopo_path)

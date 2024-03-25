@@ -1,5 +1,6 @@
 import meshio
 import numpy as np
+import logging
 
 from mesh_operations.mesh_utils import import_mesh
 from shadowspy.shape import get_centroids
@@ -123,7 +124,7 @@ def crop_mesh(polysgdf, meshes, mask, meshes_cropped):
     import shapely
 
     if not isinstance(polysgdf, gpd.GeoDataFrame):
-        print("* mask should be a GeoDataFrame")
+        logging.error("* mask should be a GeoDataFrame")
         exit()
 
     V_st, F_st, N_st, P_st = import_mesh(f"{meshes['stereo']}", get_normals=True, get_centroids=True)
@@ -140,6 +141,10 @@ def crop_mesh(polysgdf, meshes, mask, meshes_cropped):
     Fcropped = np.reshape([*map(Vdict.get, F.ravel())], (-1, 3))
     Fcropped = Fcropped[~np.isnan(Fcropped.astype(float)).any(axis=1)].astype(int)
 
+    if (len(Vcropped_st)==0) or (len(Vcropped)==0):
+        logging.error("* Meshes and mask do not overlap. Weird. Stop")
+        exit()
+        
     # save cropped mesh to file
     mesh = meshio.Mesh(Vcropped_st, [('triangle', Fcropped)])
     mesh.write(f"{meshes_cropped['stereo']}")

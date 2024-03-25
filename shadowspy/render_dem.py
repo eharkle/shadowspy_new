@@ -1,6 +1,7 @@
 import logging
 import os
 from datetime import datetime
+from matplotlib import pyplot as plt
 
 import numpy as np
 import pandas as pd
@@ -153,14 +154,17 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
 
     # check if DEM needs to be cropped (e.g., to fit image)
     if isinstance(dem_mask, gpd.GeoDataFrame):
+
+        # match image/mask and mesh crs
+        dem_mask.to_crs(crs, inplace=True)
+        
         print(f"- Cropping DEM to {dem_mask}")
         meshes_cropped = {}
         meshes_path = ('/').join(meshes['stereo'].split('/')[:-1])
         meshes_cropped['stereo'] = f"{meshes_path}/cropped_st.vtk"
         meshes_cropped['cart'] = f"{meshes_path}/cropped.vtk"
-
         crop_mesh(dem_mask, meshes, mask=dem_mask, meshes_cropped=meshes_cropped)
-
+        
         V_st, F_st, N_st, P_st = import_mesh(f"{meshes_cropped['stereo']}", get_normals=True, get_centroids=True)
         V, F, N, P = import_mesh(meshes_cropped['cart'], get_normals=True, get_centroids=True)
     else:
@@ -269,15 +273,21 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
     meas_outer_poly = gpd.GeoDataFrame(geometry=gpd.points_from_xy(df.x, df.y))
     meas_outer_poly = meas_outer_poly.dropna(axis=0).dissolve().convex_hull
     meas_outer_poly = gpd.GeoDataFrame({'geometry': meas_outer_poly.buffer(0.05, join_style=2)})
-
+    meas_outer_poly.set_crs(meas.rio.crs, inplace=True) # both crs should be in km, to be consistent with Sun...
+    
     # get full rendering at date
     dsi, date_illum_str = render_at_date(meshes, epo_utc, path_to_furnsh, center=center, crs=meas.rio.crs,
-                                         dem_mask=meas_outer_poly, basemesh_path=basemesh, point=point)
-
+                                         dem_mask=meas_outer_poly, basemesh_path=basemesh, point=point) 
+    
     # interp to measured image coordinates
     rendering = dsi.rio.reproject_match(meas, Resampling=Resampling.bilinear,
                                         nodata=np.nan)
 
+    #dsi.flux.plot(robust=True)
+    #plt.show()
+    #rendering.flux.plot(robust=True)
+    #plt.show()
+    
     # TODO make the threshold an adjustable parameter
     mask = meas.sel({'band': 1}) > 0.005
 
@@ -291,14 +301,14 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
     # print(np.min(exposure_factor), np.max(exposure_factor), np.mean(exposure_factor),
     #       np.median(exposure_factor), np.std(exposure_factor))
     #
-    # fig, ax = plt.subplots()
-    # ax.hist(rendering.flux.values.ravel(), bins=100, range=[0.001,0.05], label='rendering')
-    # ax.hist(meas.sel({'band': 1}).values.ravel(), bins=100, range=[0.001,0.05], label='NAC')
-    # plt.legend()
-    # plt.show()
+    #fig, ax = plt.subplots()
+    #ax.hist(rendering.flux.values.ravel(), bins=100, range=[0.001,0.05], label='rendering')
+    #ax.hist(meas.sel({'band': 1}).values.ravel(), bins=100, range=[0.001,0.05], label='NAC')
+    #plt.legend()
+    #plt.show()
 
-    exposure_factor = np.median(exposure_factor) #.ravel()[~np.isnan(exposure_factor.ravel())])
-
+    exposure_factor = np.nanmedian(exposure_factor) #.ravel()[~np.isnan(exposure_factor.ravel())])
+    
     if exposure_factor > 0:
         rendering /= exposure_factor
     else:  # weird cases
@@ -306,11 +316,12 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
         rendering /= max_ratio
         print(f"# Exposure=={exposure_factor}: possible issue or mainly shadowed image (?). "
               f"Normalizing with max_ratio={max_ratio.flux.values}.")
-
+        exit()
+        
     # save simulated image to raster
     outraster = f"{outdir}{img_name}_{date_illum_str}.tif"
     rendering.transpose('y', 'x').rio.to_raster(outraster)
 
-    print(f"- Flux for {img_name} saved to {outraster} (xy resolution = {rendering.rio.resolution()}mpp).")
+    print(f"- Flux for {img_name} saved to {outraster} (xy resolution = {rendering.rio.resolution()}mpp). Normalized by {exposure_factor}.")
 
     return outraster
