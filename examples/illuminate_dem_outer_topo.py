@@ -5,6 +5,7 @@ from datetime import datetime, date
 
 import matplotlib.pyplot as plt
 import pandas as pd
+
 from rasterio._io import Resampling
 from tqdm import tqdm
 import xarray as xr
@@ -16,13 +17,13 @@ from mesh_operations.merge_overlapping import merge_inout
 from shadowspy.render_dem import render_at_date, irradiance_at_date
 from mesh_operations.split_merged import split_merged
 
-if __name__ == '__main__':
+def main():
 
     # compute direct flux from the Sun
     Fsun = 1361  # W/m2
     Rb = 1737.4 # km
-    base_resolution = 2
-    max_extension = 300e3
+    base_resolution = 5
+    max_extension = 100e3
     root = "examples/"
     os.makedirs(root, exist_ok=True)
 
@@ -37,10 +38,10 @@ if __name__ == '__main__':
     tmpdir = f"{root}tmp/"
     os.makedirs(tmpdir, exist_ok=True)
 
-    tif_path = f"{indir}IM1_TerryR.tif"
+    tif_path = f"{indir}IM1_Terry.tif"
     meshpath = f"{tmpdir}{tif_path.split('/')[-1].split('.')[0]}"
-    # fartopo_path = f"{indir}LDEM_80S_80MPP_ADJ.TIF" # f"{indir}IM1_ldem_large.tif"
-    fartopo_path = "/explore/nobackup/people/mkbarker/GCD/grid/20mpp/v4/public/final/LDEM_80S_20MPP_ADJ.TIF"
+    fartopo_path = f"{indir}LDEM_80S_80MPP_ADJ.TIF" # f"{indir}IM1_ldem_large.tif"
+    # fartopo_path = "/explore/nobackup/people/mkbarker/GCD/grid/20mpp/v4/public/final/LDEM_80S_20MPP_ADJ.TIF"
     fartopomesh = fartopo_path.split('.')[0]
     ext = '.vtk'
 
@@ -114,13 +115,13 @@ if __name__ == '__main__':
     #####
 
     # get list of images from mapprojected folder
-    epos_utc = ['2024-02-22 23:24:00.0']
-    # start_time = datetime(2024, 2, 1, 23, 24, 00)
-    # end_time = datetime(2024, 2, 29, 23, 24, 00)
-    # time_step_hours = 24
-    # s = pd.Series(pd.date_range(start_time, end_time, freq=f'{time_step_hours}H')
-    #               .strftime('%Y-%m-%d %H:%M:%S.%f'))
-    # epos_utc = s.values.tolist()
+    # epos_utc = ['2024-02-22 23:24:00.0']
+    start_time = datetime(2024, 8, 1, 23, 24, 00)
+    end_time = datetime(2024, 8, 29, 23, 24, 00)
+    time_step_hours = 24*7
+    s = pd.Series(pd.date_range(start_time, end_time, freq=f'{time_step_hours}H')
+                  .strftime('%Y-%m-%d %H:%M:%S.%f'))
+    epos_utc = s.values.tolist()
     print(f"- Rendering input DEM at {epos_utc} on {len_inner_faces} triangles.")
 
     dem = xr.load_dataarray(tif_path)
@@ -170,3 +171,6 @@ if __name__ == '__main__':
 
         plt.savefig(f"{outdir}{experiment}_GLDSFLX_001_{epostr}_000.png")
         plt.show()
+
+if __name__ == '__main__':
+    main()

@@ -269,7 +269,9 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
     # raster outer shape to polygon
     ds = (meas.coarsen(x=1, boundary="trim").mean(skipna=True).
           coarsen(y=1, boundary="trim").mean(skipna=True))
-    df = ds.to_dataframe().reset_index().loc[:, ['x', 'y']] * 1e-3
+    df = ds.to_dataframe().reset_index()
+    # remove nans even for weird shapes
+    df = df.loc[df.band_data > 0, ['x', 'y']] * 1e-3
     meas_outer_poly = gpd.GeoDataFrame(geometry=gpd.points_from_xy(df.x, df.y))
     meas_outer_poly = meas_outer_poly.dropna(axis=0).dissolve().convex_hull
     meas_outer_poly = gpd.GeoDataFrame({'geometry': meas_outer_poly.buffer(0.05, join_style=2)})
