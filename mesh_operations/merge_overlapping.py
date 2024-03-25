@@ -3,8 +3,7 @@ from matplotlib import pyplot as plt
 from scipy.spatial import Delaunay
 import numpy as np
 
-from boundary_finding import triangulate_and_find_boundaries_vectorized
-from mesh_operations import triangulate_and_find_boundaries
+from mesh_operations.boundary_finding import triangulate_and_find_boundaries_vectorized
 from mesh_operations.mesh_generation import generate_terrain_mesh, stack_meshes
 from mesh_operations.mesh_utils import remove_inner_from_outer, filter_faces, load_mesh, remove_faces_with_vertices
 
