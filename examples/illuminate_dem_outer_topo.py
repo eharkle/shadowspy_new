@@ -47,7 +47,7 @@ def main():
 
     # crop fartopo to box around dem to render
     import numpy as np
-    da = xr.load_dataarray(tif_path)
+    da = xr.open_dataarray(tif_path)
     print(da)
     bounds = da.rio.bounds()
     demcx, demcy = np.mean([bounds[0], bounds[2]]), np.mean([bounds[1], bounds[3]])
@@ -63,7 +63,7 @@ def main():
     shutil.move(f"{tmpdir}b{base_resolution}_dn1_st{ext}", f"{meshpath}_st{ext}")
 
     start = time.time()
-    da_out = xr.load_dataarray(fartopo_path)
+    da_out = xr.open_dataarray(fartopo_path)
     min_resolution = int(round(da_out.rio.resolution()[0],0))
 
     # Merge inner and outer meshes seamlessly
@@ -124,7 +124,7 @@ def main():
     epos_utc = s.values.tolist()
     print(f"- Rendering input DEM at {epos_utc} on {len_inner_faces} triangles.")
 
-    dem = xr.load_dataarray(tif_path)
+    dem = xr.open_dataarray(tif_path)
     demcrs = dem.rio.crs
 
     for epo_in in tqdm(epos_utc, total=len(epos_utc)):

@@ -40,7 +40,7 @@ if __name__ == '__main__':
     print(f"- Computing trimesh for {tif_path}...")
 
     # extract crs
-    dem = xr.load_dataset(tif_path)
+    dem = xr.open_dataset(tif_path)
     dem_crs = dem.rio.crs
 
     # regular delauney mesh

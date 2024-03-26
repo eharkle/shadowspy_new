@@ -41,10 +41,10 @@ if __name__ == '__main__':
     print(f"- Computing trimesh for {tif_path}...")
 
     # extract crs
-    dem = xr.load_dataset(tif_path)
+    dem = xr.open_dataset(tif_path)
     dem_crs = dem.rio.crs
 
-    small_tif = xr.load_dataset(tif_path).isel(band=0, x=slice(None, 200), y=slice(None, 200))
+    small_tif = xr.open_dataset(tif_path).isel(band=0, x=slice(None, 200), y=slice(None, 200))
     print(small_tif)
     print(small_tif.rio.resolution())
     tif_path = f'{indir}np0_20mpp_smaller.tif'#

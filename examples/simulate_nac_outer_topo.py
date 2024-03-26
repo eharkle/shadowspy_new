@@ -37,7 +37,7 @@ if __name__ == '__main__':
 
     # regular delauney mesh
     ext = '.vtk'
-    fartopo = xr.load_dataset(tif_path)
+    fartopo = xr.open_dataset(tif_path)
     fartopo -= Rb*1e3
     fartopo.band_data.rio.to_raster(f"{indir}dm2_rescaled.tif")
     mesh_generation.make(base_resolution, [1], f"{indir}dm2_rescaled.tif", out_path=root, mesh_ext=ext)
@@ -47,10 +47,10 @@ if __name__ == '__main__':
 
     # compute far topography mesh
     ext = '.vtk'
-    fartopo = xr.load_dataset(fartopo_path)
+    fartopo = xr.open_dataset(fartopo_path)
     fartopo -= Rb*1e3
     fartopo.band_data.rio.to_raster(f"{indir}fartopo_rescaled.tif")
-    # xr.load_dataset(f"{indir}fartopo_rescaled.tif").band_data.plot(robust=True)
+    # xr.open_dataset(f"{indir}fartopo_rescaled.tif").band_data.plot(robust=True)
     # plt.show()
     # exit()
     mesh_generation.make(120, [1], f"{indir}fartopo_rescaled.tif", out_path=root, mesh_ext=ext)

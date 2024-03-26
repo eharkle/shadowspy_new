@@ -267,7 +267,7 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
     os.makedirs(outdir, exist_ok=True)
 
     # interpolate to NAC nodes
-    meas = xr.load_dataarray(meas_path)
+    meas = xr.open_dataarray(meas_path)
     meas = meas.where(meas >= 0)
 
     # raster outer shape to polygon

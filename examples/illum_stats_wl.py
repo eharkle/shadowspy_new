@@ -84,7 +84,7 @@ if __name__ == '__main__':
     # load and stack dataarrays from list
     list_da = []
     for idx, epo in tqdm(enumerate(epos_utc)): #dsi_list.items():
-        da = xr.load_dataset(f"{outdir}{siteid}/{siteid}_{idx}.tif")
+        da = xr.open_dataset(f"{outdir}{siteid}/{siteid}_{idx}.tif")
         da = da.assign_coords(time=epo)
         da = da.expand_dims(dim="time")
         da['flux'] = da.band_data
