@@ -23,8 +23,8 @@ def merge_inout(inner_mesh, outer_mesh, output_path, debug=False):
     faces = filter_faces(mask, outer_mesh['F'])
 
     # Perform triangulation and find boundaries TODO check if ok
-    # faces_out, dummy, inner_vertices_outer = triangulate_and_find_boundaries_vectorized(faces, vertices_out)
-    faces_out, dummy, inner_vertices_outer = triangulate_and_find_boundaries_vectorized(faces, vertices_with_hole)
+    faces_out, dummy, inner_vertices_outer = triangulate_and_find_boundaries_vectorized(faces, vertices_out)
+    # faces_out, dummy, inner_vertices_outer = triangulate_and_find_boundaries_vectorized(faces, vertices_with_hole) # don't use, results in artifacts
     vertices_in = np.vstack((x_in, y_in, z_in)).T
     faces_in, outer_vertices_inner, dummy = triangulate_and_find_boundaries_vectorized(inner_mesh['F'], vertices_in)
 
@@ -79,7 +79,7 @@ def merge_inout(inner_mesh, outer_mesh, output_path, debug=False):
 
 if __name__ == '__main__':
 
-    debug = True
+    debug = False
 
     if debug:
         # Parameters for the inner (high-res) and outer (low-res) meshes
