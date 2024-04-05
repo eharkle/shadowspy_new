@@ -38,11 +38,11 @@ def plot3d(mesh_path, var_to_plot, center='P'):
         pl.show(cpos='xy')
 
 
-def extended_sun(sun_vecs, extsun_coord):
+def extended_source(sun_vecs, extsource_coord):
     import csv
 
     extsun_ = []
-    with open(extsun_coord) as csvDataFile:
+    with open(extsource_coord) as csvDataFile:
         csvReader = csv.reader(csvDataFile, delimiter=",", quoting=csv.QUOTE_NONNUMERIC)
         for row in csvReader:
             extsun_.append([x for x in row if x != ''])
@@ -57,12 +57,11 @@ def extended_sun(sun_vecs, extsun_coord):
     Rs = 695700.  # Sun radius, km
 
     extsun_tiled = np.tile(extsun_, (sun_vecs.shape[0], 1))
-
     return sun_veccs + Vs * extsun_tiled[:, 0][:, np.newaxis] * Rs + Ws * extsun_tiled[:, 1][:, np.newaxis] * Rs
 
 
 def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN', inc_flux=1361., center='P',
-                     point=True, basemesh=None, return_irradiance=False, azi_ele_deg=None, extsun_coord=None):
+                     point=True, basemesh=None, return_irradiance=False, azi_ele_deg=None, extsource_coord=None):
     if center == 'V':
         C = shape_model.V
         N = shape_model.VN
@@ -90,16 +89,16 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN
         source_vecs = point_source_vecs
         sourcedir = source_vecs / np.linalg.norm(source_vecs)
     else:
-        if extsun_coord == None:
+        if extsource_coord == None:
             logging.error(f"* Requested extended source, but set extsun_coord to None.")
             exit()
         
         if source == 'SUN':
-            source_vecs = extended_sun(point_source_vecs,
-                                extsun_coord=f"examples/aux/coordflux_100pts_outline33_centerlast_R1_F1_stdlimbdark.txt")
+            source_vecs = extended_source(point_source_vecs,
+                                          extsource_coord=extsource_coord) #f"examples/aux/coordflux_100pts_outline33_centerlast_R1_F1_stdlimbdark.txt")
         elif source == 'EARTH':
-            source_vecs = extended_sun(point_source_vecs,
-                                extsun_coord=f"examples/aux/Source2D_Earth_100pts_centerlast.inc")
+            source_vecs = extended_source(point_source_vecs,
+                                          extsource_coord=extsource_coord) #f"examples/aux/Source2D_Earth_100pts_centerlast.inc")
         else:
             logging.error(f"* Only SUN and EARTH set as possible light-sources. User asked for {source}. Exit.")
             exit()
@@ -132,7 +131,8 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN
 
 
 def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_mask=None, source='SUN', inc_flux=1361,
-                   basemesh_path=None, show=False, point=True, azi_ele_deg=None, return_irradiance=False, extsun_coord=None):
+                   basemesh_path=None, show=False, point=True, azi_ele_deg=None, return_irradiance=False,
+                   extsource_coord=None):
     """
     Render terrain at epoch
     @param meshes:
@@ -188,7 +188,8 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
     # get flux at observer (would be good to just ask for F/V overlapping with meas image)
     flux_at_obs = get_flux_at_date(shape_model, date_illum_spice, path_to_furnsh=path_to_furnsh, source=source,
                                    inc_flux=inc_flux, center=center, point=point, basemesh=basemesh,
-                                   return_irradiance=return_irradiance, azi_ele_deg=azi_ele_deg, extsun_coord=extsun_coord)
+                                   return_irradiance=return_irradiance, azi_ele_deg=azi_ele_deg,
+                                   extsource_coord=extsource_coord)
 
     if show:
         # plot3d(mesh_path=f"{meshes['cart']}", var_to_plot=flux_at_obs)
@@ -203,13 +204,22 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
         flux_df = pd.DataFrame(np.vstack([P_st[:, 0].ravel(), P_st[:, 1].ravel(), flux_at_obs]).T,
                                columns=['x', 'y', 'flux'])
 
-    flux_df = flux_df.set_index(['y', 'x'])
+    duplicates = flux_df.duplicated(subset=['y', 'x'], keep='first')
+    if len(flux_df[duplicates]) > 0:
+        logging.warning(f"- render_at_date is dropping {len(flux_df[duplicates])/len(flux_df)*100.}% duplicated rows. Check.")
+        print(flux_df[duplicates].sort_values(by=['x', 'y']))
+        flux_df = flux_df[~duplicates]
+
+    flux_df = flux_df.set_index(['y', 'x'], verify_integrity=True)
     ds = flux_df.to_xarray()
 
     if crs != None:
         # assign crs
         img_crs = crs
         ds.rio.write_crs(img_crs, inplace=True)
+
+    # ds.flux.plot(robust=True)
+    # plt.show()
 
     # interpolate nans
     ds['x'] = ds.x * 1e3
