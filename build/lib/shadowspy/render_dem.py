@@ -62,7 +62,7 @@ def extended_sun(sun_vecs, extsun_coord):
 
 
 def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN', inc_flux=1361., center='P',
-                     point=True, basemesh=None, return_irradiance=False, azi_ele_deg=None):
+                     point=True, basemesh=None, return_irradiance=False, azi_ele_deg=None, extsun_coord=None):
     if center == 'V':
         C = shape_model.V
         N = shape_model.VN
@@ -90,6 +90,10 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN
         source_vecs = point_source_vecs
         sourcedir = source_vecs / np.linalg.norm(source_vecs)
     else:
+        if extsun_coord == None:
+            logging.error(f"* Requested extended source, but set extsun_coord to None.")
+            exit()
+        
         if source == 'SUN':
             source_vecs = extended_sun(point_source_vecs,
                                 extsun_coord=f"examples/aux/coordflux_100pts_outline33_centerlast_R1_F1_stdlimbdark.txt")
@@ -128,7 +132,7 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN
 
 
 def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_mask=None, source='SUN', inc_flux=1361,
-                   basemesh_path=None, show=False, point=True, azi_ele_deg=None, return_irradiance=False):
+                   basemesh_path=None, show=False, point=True, azi_ele_deg=None, return_irradiance=False, extsun_coord=None):
     """
     Render terrain at epoch
     @param meshes:
@@ -184,7 +188,7 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
     # get flux at observer (would be good to just ask for F/V overlapping with meas image)
     flux_at_obs = get_flux_at_date(shape_model, date_illum_spice, path_to_furnsh=path_to_furnsh, source=source,
                                    inc_flux=inc_flux, center=center, point=point, basemesh=basemesh,
-                                   return_irradiance=return_irradiance, azi_ele_deg=azi_ele_deg)
+                                   return_irradiance=return_irradiance, azi_ele_deg=azi_ele_deg, extsun_coord=extsun_coord)
 
     if show:
         # plot3d(mesh_path=f"{meshes['cart']}", var_to_plot=flux_at_obs)

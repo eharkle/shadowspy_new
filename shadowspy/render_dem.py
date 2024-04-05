@@ -332,7 +332,7 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
         rendering /= max_ratio
         print(f"# Exposure=={exposure_factor}: possible issue or mainly shadowed image (?). "
               f"Normalizing with max_ratio={max_ratio.flux.values}.")
-        exit()
+        #exit()
         
     # save simulated image to raster
     outraster = f"{outdir}{img_name}_{date_illum_str}.tif"
