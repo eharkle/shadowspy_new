@@ -12,6 +12,7 @@ from matplotlib import pyplot as plt
 
 import mesh_generation
 from examples.download_kernels import download_kernels
+from helpers import prepare_inner_outer_mesh
 from shadowspy.render_dem import render_at_date, irradiance_at_date
 from shadowspy.flux_util import get_Fsun
 
@@ -22,6 +23,8 @@ if __name__ == '__main__':
 
     Rb = 1737.4  # km
     base_resolution = 5
+    max_extension = 40e3
+    extres = {20e3: 60, 60e3: 120, 100e3: 240, 300e3: 480}
     root = "examples/"
     os.makedirs(root, exist_ok=True)
 
@@ -32,10 +35,12 @@ if __name__ == '__main__':
     indir = f"{root}aux/"
     outdir = f"{root}out/uv/"
     os.makedirs(outdir, exist_ok=True)
+    tmpdir = f"{root}tmp/"
+    os.makedirs(tmpdir, exist_ok=True)
+
     # tif_path = f'{indir}ldem_6_cut.tif'  #
     tif_path = f'{indir}{siteid}_final_adj_5mpp_surf.tif'  #
-    # tif_path = f"/home/sberton2/Lavoro/projects/HabNiches/dems/{siteid}_final_adj_5mpp_surf.tif"
-    # flux_path = f"{indir}ssi_v02r01_yearly_s1610_e2022_c20230120.nc" (only covers >115 nm)
+    fartopo_path = ""
     flux_path = f"{indir}ref_solar_irradiance_whi-2008_ver2.dat"
     meshpath = tif_path.split('.')[0]
 
@@ -45,10 +50,25 @@ if __name__ == '__main__':
 
     # regular delauney mesh
     ext = '.vtk'
-    mesh_generation.make(base_resolution, [1], tif_path, out_path=f"{indir}{siteid}_", mesh_ext=ext)
+    mesh_generation.make(base_resolution, [1], tif_path, out_path=f"{indir}{siteid}_", mesh_ext=ext,
+                         rescale_fact=1e-3, lonlat0=(0, -90))
     shutil.move(f"{indir}{siteid}_b{base_resolution}_dn1{ext}", f"{meshpath}{ext}")
     shutil.move(f"{indir}{siteid}_b{base_resolution}_dn1_st{ext}", f"{meshpath}_st{ext}")
     print(f"- Meshes generated after {round(time.time() - start, 2)} seconds.")
+
+    # prepare full mesh (inner + outer)
+    len_inner_faces_path = f'{tmpdir}len_inner_faces.txt'
+    if os.path.exists(len_inner_faces_path):
+        last_ext = max({ext: res for ext, res in extres.items() if ext < max_extension}.keys())
+        len_inner_faces = pd.read_csv(len_inner_faces_path, header=None).values[0][0]
+        inner_mesh_path = meshpath
+        outer_mesh_path = f"{tmpdir}LDEM_{int(last_ext)}M_outer"
+    else:
+        len_inner_faces, inner_mesh_path, outer_mesh_path = prepare_inner_outer_mesh(tif_path, fartopo_path, extres,
+                                                                                     max_extension, Rb, tmpdir,
+                                                                                     meshpath, ext)
+        with open(len_inner_faces_path, 'w') as f:
+            f.write('%d' % len_inner_faces)
 
     # open index
     lnac_index = f"{indir}CUMINDEX_LROC.TAB"

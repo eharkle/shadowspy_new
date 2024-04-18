@@ -7,11 +7,23 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 
+RAYTRACING_BACKEND = 'cgal' #'embree' #
+RAYTRACING_BACKEND = RAYTRACING_BACKEND.lower()
+if RAYTRACING_BACKEND == 'cgal':
+    from shadowspy.shape import CgalTrimeshShapeModel as MyTrimeshShapeModel
+elif RAYTRACING_BACKEND == 'embree':
+    try:
+        import embree
+    except:
+        logging.error("* You need to add embree_vars to the PATH to use embree")
+    from shadowspy.shape import EmbreeTrimeshShapeModel as MyTrimeshShapeModel
+else:
+    raise ValueError('RAYTRACING_BACKEND should be one of: "cgal", "embree"')
+
 from shadowspy.coord_tools import cart2sph, azimuth_elevation_to_cartesian
 from mesh_operations.mesh_utils import import_mesh
 from mesh_operations.mesh_tools import crop_mesh
 from shadowspy.spice_util import get_sourcevec
-from shadowspy.shape import CgalTrimeshShapeModel  # , EmbreeTrimeshShapeModel
 import xarray as xr
 from rasterio.enums import Resampling
 
@@ -177,11 +189,11 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
         V, F, N, P = import_mesh(f"{meshes['cart']}", get_normals=True, get_centroids=True)
         meshes_cropped = meshes
 
-    shape_model = CgalTrimeshShapeModel(V, F, N)
+    shape_model = MyTrimeshShapeModel(V, F, N)
 
     if basemesh_path != None:
         V_ds, F_ds, N_ds, P_ds = import_mesh(basemesh_path, get_normals=True, get_centroids=True)
-        basemesh = CgalTrimeshShapeModel(V_ds, F_ds, N_ds)
+        basemesh = MyTrimeshShapeModel(V_ds, F_ds, N_ds)
     else:
         basemesh = None
 
@@ -294,11 +306,11 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
     meas_outer_poly = meas_outer_poly.dropna(axis=0).dissolve().convex_hull
     meas_outer_poly = gpd.GeoDataFrame({'geometry': meas_outer_poly.buffer(0.05, join_style=2)})
     meas_outer_poly.set_crs(meas.rio.crs, inplace=True) # both crs should be in km, to be consistent with Sun...
-    
+
     # get full rendering at date
     dsi, date_illum_str = render_at_date(meshes, epo_utc, path_to_furnsh, center=center, crs=meas.rio.crs,
-                                         dem_mask=meas_outer_poly, basemesh_path=basemesh, point=point) 
-    
+                                         dem_mask=meas_outer_poly, basemesh_path=basemesh, point=point)
+
     # interp to measured image coordinates
     rendering = dsi.rio.reproject_match(meas, Resampling=Resampling.bilinear,
                                         nodata=np.nan)
