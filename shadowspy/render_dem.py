@@ -276,6 +276,10 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
         outdir = f"{pdir}out/"
     os.makedirs(outdir, exist_ok=True)
 
+    if not basemesh is None:
+        logging.warning("* Outer mesh not yet implemented for render_match_image. Setting back to None.")
+        basemesh = None
+    
     # interpolate to NAC nodes
     meas = xr.open_dataarray(meas_path)
     meas = meas.where(meas >= 0)
@@ -331,8 +335,8 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
         max_ratio = rendering.max() / meas.sel({'band': 1}).max()
         rendering /= max_ratio
         print(f"# Exposure=={exposure_factor}: possible issue or mainly shadowed image (?). "
-              f"Normalizing with max_ratio={max_ratio.flux.values}.")
-        #exit()
+              f"Normalizing with max_ratio={max_ratio.flux.values}. Exit.")
+        exit()
         
     # save simulated image to raster
     outraster = f"{outdir}{img_name}_{date_illum_str}.tif"

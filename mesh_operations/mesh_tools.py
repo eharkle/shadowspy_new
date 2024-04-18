@@ -129,7 +129,7 @@ def crop_mesh(polysgdf, meshes, mask, meshes_cropped):
 
     V_st, F_st, N_st, P_st = import_mesh(f"{meshes['stereo']}", get_normals=True, get_centroids=True)
     V, F, N, P = import_mesh(f"{meshes['cart']}", get_normals=True, get_centroids=True)
-
+    
     pointsDF = gpd.GeoDataFrame(geometry=shapely.points(V_st[:, 0], V_st[:, 1]))
     joinDF = pointsDF.sjoin(mask, how='left', op="within")
     # crop V
