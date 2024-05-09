@@ -1,0 +1,10 @@
+base_resolution: 80
+max_extension: 40e3
+root: "./"
+indir: "./aux/"
+dem_path: "/home/sberton2/Lavoro/projects/validate_shadowspy/LDEM_80S_40MPP_ADJ.TIF"
+outdir: "./out/"
+tmpdir: "./tmp/"
+start_time: datetime.datetime(2026, 1, 30, hour=15)
+end_time: datetime.datetime(2025, 9, 21, hour=16)
+time_step_hours: 1

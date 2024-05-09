@@ -1,20 +1,17 @@
 import os
 import shutil
 import time
-from datetime import datetime, date
+from datetime import datetime
 
-import matplotlib.pyplot as plt
 import pandas as pd
 
-from rasterio._io import Resampling
 from tqdm import tqdm
 import xarray as xr
-import rioxarray
 
 from examples.download_kernels import download_kernels
 from helpers import prepare_inner_outer_mesh
-from mesh_operations import mesh_generation
-from shadowspy.render_dem import irradiance_at_date
+from src.mesh_operations import mesh_generation
+from src.shadowspy.render_dem import irradiance_at_date
 
 def main():
 
@@ -97,38 +94,38 @@ def main():
                                           basemesh_path=f"{outer_mesh_path}{ext}",
                                           point=True, source='SUN', inc_flux=Fsun)
 
-        epostr = datetime.strptime(epo_in,'%Y-%m-%d %H:%M:%S.%f')
-        epostr = epostr.strftime('%y%m%d%H%M%S')
-
-        fig, axes = plt.subplots(1, 2, sharex=False, sharey=False, figsize=(15, 5) )
-
-        # rearrange axes, match dem, and save
-        dsi['x'] = dsi['x']#*1e-3
-        dsi['y'] = dsi['y']#*1e-3
-        dsi.rio.write_crs(demcrs, inplace=True)
-        dsi.rio.reproject_match(dem, resampling=Resampling.bilinear, inplace=True)
-        dsi.flux.rio.to_raster(f"{meshpath}_dsi.tif")
-
-        # plot
-        dsi.flux.plot(robust=True, ax=axes[0])
-        axes[0].set_title('New inner mesh only')
-
-        # rearrange axes, match dem, and save
-        dsi_far['x'] = dsi_far['x']#*1e-3
-        dsi_far['y'] = dsi_far['y']#*1e-3
-        dsi_far.rio.write_crs(demcrs, inplace=True)
-        target_resolution = int(round(dem.rio.resolution()[0],0))
-        dsi_far.rio.reproject_match(dem, resampling=Resampling.bilinear, inplace=True)
-        dsi_far = dsi_far.rio.reproject(dsi_far.rio.crs, resolution=target_resolution, resampling=Resampling.bilinear)
-        # dsi_far.flux.rio.to_raster(f"{outdir}{experiment}_GLDSFLX_001_{epostr}_000.tif")
-
-        # plot
-        dsi_far.flux.plot(robust=True, ax=axes[1])
-        axes[1].set_title('New inner mesh + ldem merged')
-
-        plt.savefig(f"{outdir}{experiment}_GLDSFLX_001_{epostr}_000.png")
-        # plt.show()
-        print(f"done {epo_in}")
+        # epostr = datetime.strptime(epo_in,'%Y-%m-%d %H:%M:%S.%f')
+        # epostr = epostr.strftime('%y%m%d%H%M%S')
+        #
+        # fig, axes = plt.subplots(1, 2, sharex=False, sharey=False, figsize=(15, 5) )
+        #
+        # # rearrange axes, match dem, and save
+        # dsi['x'] = dsi['x']#*1e-3
+        # dsi['y'] = dsi['y']#*1e-3
+        # dsi.rio.write_crs(demcrs, inplace=True)
+        # dsi.rio.reproject_match(dem, resampling=Resampling.bilinear, inplace=True)
+        # dsi.flux.rio.to_raster(f"{meshpath}_dsi.tif")
+        #
+        # # plot
+        # dsi.flux.plot(robust=True, ax=axes[0])
+        # axes[0].set_title('New inner mesh only')
+        #
+        # # rearrange axes, match dem, and save
+        # dsi_far['x'] = dsi_far['x']#*1e-3
+        # dsi_far['y'] = dsi_far['y']#*1e-3
+        # dsi_far.rio.write_crs(demcrs, inplace=True)
+        # target_resolution = int(round(dem.rio.resolution()[0],0))
+        # dsi_far.rio.reproject_match(dem, resampling=Resampling.bilinear, inplace=True)
+        # dsi_far = dsi_far.rio.reproject(dsi_far.rio.crs, resolution=target_resolution, resampling=Resampling.bilinear)
+        # # dsi_far.flux.rio.to_raster(f"{outdir}{experiment}_GLDSFLX_001_{epostr}_000.tif")
+        #
+        # # plot
+        # dsi_far.flux.plot(robust=True, ax=axes[1])
+        # axes[1].set_title('New inner mesh + ldem merged')
+        #
+        # plt.savefig(f"{outdir}{experiment}_GLDSFLX_001_{epostr}_000.png")
+        # # plt.show()
+        # print(f"done {epo_in}")
 
 if __name__ == '__main__':
     main()

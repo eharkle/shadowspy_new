@@ -3,13 +3,12 @@ import os
 import shutil
 import time
 
-import matplotlib.pyplot as plt
 import pandas as pd
 
 import mesh_generation
 from examples.download_kernels import download_kernels
-from shadowspy.image_util import read_img_properties
-from shadowspy.render_dem import render_match_image
+from src.shadowspy import read_img_properties
+from src.shadowspy.render_dem import render_match_image
 import xarray as xr
 
 if __name__ == '__main__':

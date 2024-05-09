@@ -1,0 +1,33 @@
+# general
+# -------
+siteid: None
+Fsun: 1361  # W/m2
+flux_path: None
+wavelength: None
+Rb: 1737.4  # km
+base_resolution: None
+config_file: None
+download_kernels: false
+
+# meshes
+# ------
+max_extension: 400e3
+extres: {20e3: 60, 60e3: 120, 100e3: 240, 300e3: 480}
+lonlat0_stereo: (0, -90)
+
+# epochs
+epos_utc: [] # ['2023-09-29 06:00:00.0']
+start_time: None # datetime.datetime(2026, 1, 30, hour=15)
+end_time: None # datetime.datetime(2025, 9, 21, hour=16)
+time_step_hours: 24
+
+# dirs
+# ----
+root: None
+indir: None
+dem_path: None
+fartopo_path: None
+outdir: None
+tmpdir: None
+
+

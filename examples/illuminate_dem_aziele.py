@@ -1,19 +1,15 @@
-import glob
 import os
 import shutil
 import time
 from datetime import datetime
 
-import matplotlib.pyplot as plt
-import numpy as np
 import xarray as xr
-import pandas as pd
 from tqdm import tqdm
 from rasterio.enums import Resampling
 
 import mesh_generation
 from examples.download_kernels import download_kernels
-from shadowspy.render_dem import render_at_date
+from src.shadowspy.render_dem import render_at_date
 
 if __name__ == '__main__':
 

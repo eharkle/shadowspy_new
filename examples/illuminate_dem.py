@@ -1,4 +1,3 @@
-import glob
 import os
 import shutil
 import time
@@ -8,9 +7,9 @@ import pandas as pd
 from tqdm import tqdm
 import sys
 
-import mesh_generation
+from src.mesh_operations import mesh_generation
 from examples.download_kernels import download_kernels
-from shadowspy.render_dem import render_at_date
+from src.shadowspy.render_dem import render_at_date
 from rasterio.enums import Resampling
 
 if __name__ == '__main__':
@@ -57,9 +56,9 @@ if __name__ == '__main__':
 
     # get list of images from mapprojected folder
     # epos_utc = ['2023-07-09 17:15:00.0', '2023-07-09 15:17:00.0']
-    start_time = datetime.date(2025, 6, 21)
-    end_time = datetime.date(2025, 9, 21)
-    time_step_hours = 24
+    start_time = datetime.datetime(2026, 1, 30, hour=15)
+    end_time = datetime.datetime(2025, 9, 21, hour=16)
+    time_step_hours = 1
     s = pd.Series(pd.date_range(start_time, end_time, freq=f'{time_step_hours}H')
                   .strftime('%Y-%m-%d %H:%M:%S.%f'))
     epos_utc = s.values.tolist()

@@ -12,3 +12,5 @@ examples/out
 examples/aux/*.tif
 examples/*tar.gz
 examples/aux/*.ply
+build
+shadow-env

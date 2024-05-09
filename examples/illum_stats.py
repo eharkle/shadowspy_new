@@ -1,7 +1,3 @@
-import sys
-import glob
-import json
-import logging
 import os
 import shutil
 import time
@@ -12,145 +8,127 @@ from tqdm import tqdm
 from matplotlib import pyplot as plt
 from rasterio.enums import Resampling
 
-import mesh_generation
-from shadowspy.render_dem import irradiance_at_date
+from examples.download_kernels import download_kernels
+from src.config import ShSpOpt
+from src.mesh_operations import mesh_generation
+from src.mesh_operations.helpers import prepare_inner_outer_mesh
+from src.shadowspy.flux_util import get_Fsun
+from src.shadowspy.raster_products import basic_raster_stats
+from src.shadowspy.render_dem import irradiance_at_date
+from src.shadowspy.utils import run_log
 
 if __name__ == '__main__':
+    # compute direct flux from the Sun
 
     start = time.time()
 
-    # DM2, S01, Haworth close to ray, De Gerlache S11, Malapert
-    siteid = sys.argv[1] # 'Site23' # 'DM2'
+    opt = ShSpOpt()
+    opt.setup_config()
 
-    # compute direct flux from the Sun
-    Fsun = 1361  # W/m2
-    Rb = 1737.4  # km
-    base_resolution = 2
-    root = "examples/"
-    os.makedirs(root, exist_ok=True)
+    # set local vars (backward compatibility)
+    siteid = opt.siteid
+    Rb = opt.Rb
+    base_resolution = opt.base_resolution
+    max_extension = opt.max_extension
+    extres = opt.extres
+    root = opt.root
+    indir = opt.indir
+    dem_path = opt.dem_path
+    if opt.fartopo_path is not None:
+        fartopo_path = opt.fartopo_path
+    else:
+        fartopo_path = None # dem_path
+    outdir = opt.outdir
+    tmpdir = opt.tmpdir
 
     # download kernels
-    #download_kernels()
+    if opt.download_kernels:
+        download_kernels()
 
     # Elevation/DEM GTiff input
-    indir = f"{root}aux/"
-    tif_path = f'{indir}{siteid}_GLDELEV_001.tif' # _final_adj_5mpp_surf.tif'  #
-    outdir = f"{root}out/"
+    meshpath = dem_path.split('.')[0]
+
+    # prepare dirs
+    os.makedirs(root, exist_ok=True)
     os.makedirs(f"{outdir}{siteid}/", exist_ok=True)
-    meshpath = tif_path.split('.')[0]
+    os.makedirs(tmpdir, exist_ok=True)
 
     # prepare mesh of the input dem
     start = time.time()
-    print(f"- Computing trimesh for {tif_path}...")
+    print(f"- Computing trimesh for {dem_path}...")
 
     # extract crs
-    dem = xr.open_dataset(tif_path)
+    dem = xr.open_dataset(dem_path)
     dem_crs = dem.rio.crs
     
     # regular delauney mesh
     ext = '.vtk'
-    mesh_generation.make(base_resolution, [1], tif_path, out_path=root, mesh_ext=ext)
+    mesh_generation.make(base_resolution, [1], dem_path, out_path=f"{indir}{siteid}_",
+                         mesh_ext=ext, rescale_fact=1e-3, lonlat0=opt.lonlat0_stereo)
     shutil.move(f"{root}b{base_resolution}_dn1{ext}", f"{meshpath}{ext}")
     shutil.move(f"{root}b{base_resolution}_dn1_st{ext}", f"{meshpath}_st{ext}")
     print(f"- Meshes generated after {round(time.time() - start, 2)} seconds.")
 
-    # open index
-    #lnac_index = f"{indir}CUMINDEX_LROC.TAB"
-    #cumindex = pd.read_csv(lnac_index, index_col=None)
+    # prepare full mesh (inner + outer)
+    if fartopo_path is not None:
+        len_inner_faces_path = f'{tmpdir}len_inner_faces.txt'
+        if os.path.exists(len_inner_faces_path):
+            last_ext = max({ext: res for ext, res in extres.items() if ext < max_extension}.keys())
+            len_inner_faces = pd.read_csv(len_inner_faces_path, header=None).values[0][0]
+            inner_mesh_path = meshpath
+            outer_mesh_path = f"{tmpdir}LDEM_{int(last_ext)}M_outer"
+        else:
+            len_inner_faces, inner_mesh_path, outer_mesh_path = prepare_inner_outer_mesh(dem_path, fartopo_path, extres,
+                                                                                         max_extension, Rb, tmpdir,
+                                                                                         meshpath, ext)
+            with open(len_inner_faces_path, 'w') as f:
+                f.write('%d' % len_inner_faces)
 
     # get list of images from mapprojected folder
-    # epos_utc = ['2023-09-29 06:00:00.0']
-    start_time = datetime.date(2025, 6, 21)
-    end_time = datetime.date(2025, 9, 21)
-    time_step_hours = 12
-    s = pd.Series(pd.date_range(start_time, end_time, freq=f'{time_step_hours}H')
-                  .strftime('%Y-%m-%d %H:%M:%S.%f'))
-    epos_utc = s.values.tolist()
+    if opt.epos_utc is None:
+        s = pd.Series(pd.date_range(opt.start_time, opt.end_time, freq=f'{opt.time_step_hours}H')
+                      .strftime('%Y-%m-%d %H:%M:%S.%f'))
+        epos_utc = s.values.tolist()
+    else:
+        epos_utc = opt.epos_utc
     print(f"- Rendering input DEM at {epos_utc}.")
 
-    dsi_list = {}
+    # actually compute irradiance at each epoch in epos_utc
+    dsi_epo_path_dict = {}
     for idx, epo_in in tqdm(enumerate(epos_utc), total=len(epos_utc)):
+
+        if opt.flux_path is None:
+            Fsun = get_Fsun(opt.flux_path, epo_in, wavelength=opt.wavelength)
+        else:
+            Fsun = opt.Fsun
+
         dsi, epo_out = irradiance_at_date(meshes={'stereo': f"{meshpath}_st{ext}", 'cart': f"{meshpath}{ext}"},
-                                            path_to_furnsh=f"{indir}simple.furnsh", epo_utc=epo_in,
+                                          path_to_furnsh=f"{indir}simple.furnsh", epo_utc=epo_in,
                                           point=True, source='SUN', inc_flux=Fsun)
+
+        # get illum epoch string
+        epostr = datetime.strptime(epo_in,'%Y-%m-%d %H:%M:%S.%f')
+        epostr = epostr.strftime('%y%m%d%H%M%S')
+
+        # define useful quantities
+        outpath = f"{outdir}{siteid}/{siteid}_{epostr}_{idx}"
+        dsi_epo_path_dict[epostr] = outpath
 
         # save each output to raster to save memory
         dsi = dsi.assign_coords(time=epo_in)
         dsi = dsi.expand_dims(dim="time")
         dsi = dsi.rio.reproject_match(dem, resampling=Resampling.bilinear)
-        dsi.flux.rio.to_raster(f"{outdir}{siteid}/{siteid}_{idx}.tif")
+        dsi.flux.rio.to_raster(f"{outpath}.tif")
         dsi.flux.plot(clim=[0, 350])
-        epostr = datetime.strptime(epo_in,'%Y-%m-%d %H:%M:%S.%f')
-        epostr = epostr.strftime('%y%m%d%H%M%S')
-        plt.savefig(f'{outdir}{siteid}/{siteid}_illum_{epostr}_{idx}.png')
+        plt.savefig(f"{outpath}.png")
         plt.clf()
-        
-    # load and stack dataarrays from list
-    list_da = []
-    for idx, epo in tqdm(enumerate(epos_utc)): #dsi_list.items():
-        da = xr.open_dataset(f"{outdir}{siteid}/{siteid}_{idx}.tif")
-        da = da.assign_coords(time=epo)
-        da = da.expand_dims(dim="time")
-        da['flux'] = da.band_data
-        da = da.drop_vars("band_data")
-        list_da.append(da)
 
-    # stack dataarrays in list
-    ds = xr.combine_by_coords(list_da)
-    moon_sp_crs = xr.open_dataset(tif_path).rio.crs
-    ds.rio.write_crs(moon_sp_crs, inplace=True)
-    print(ds)
-
-    # get cumulative flux
-    step_sec = time_step_hours * 3600.
-    dssum = (ds * step_sec).sum(dim='time')
-    # get max flux
-    dsmax = ds.max(dim='time')
-    # get average flux
-    dsmean = ds.mean(dim='time')
-
-    # save to raster
-    format_code = '%Y%m%d%H%M%S'
-    start_time = start_time.strftime(format_code)
-    end_time = end_time.strftime(format_code)
-
-    sumout = f"{outdir}{siteid}_sum_{start_time}_{end_time}.tif"
-    dssum.flux.rio.to_raster(sumout)
-    logging.info(f"- Cumulative flux saved to {sumout}.")
-
-    maxout = f"{outdir}{siteid}_max_{start_time}_{end_time}.tif"
-    dsmax.flux.rio.to_raster(maxout)
-    logging.info(f"- Maximum flux saved to {maxout}.")
-
-    meanout = f"{outdir}{siteid}_mean_{start_time}_{end_time}.tif"
-    dsmean.flux.rio.to_raster(meanout)
-    logging.info(f"- Average flux over saved to {meanout}.")
-
-    # plot statistics
-    fig, axes = plt.subplots(1, 3, figsize=(26, 6))
-    dssum.flux.plot(ax=axes[0], robust=True)
-    axes[0].set_title(r'Sum (J/m$^2$)')
-    dsmax.flux.plot(ax=axes[1], robust=True)
-    axes[1].set_title(r'Max (W/m$^2$)')
-    dsmean.flux.plot(ax=axes[2], robust=True)
-    axes[2].set_title(r'Mean (W/m$^2$)')
-    plt.suptitle(f'Statistics of solar flux at {siteid} between {start_time} and {end_time}.')
-    pngout = f"{outdir}{siteid}_stats_{start_time}_{end_time}.png"
-    plt.savefig(pngout)
-    # plt.show()
+    # prepare mean, sum, max stats rasters
+    basic_raster_stats(dsi_epo_path_dict, opt.time_step_hours, crs=dem_crs, outdir=outdir, siteid=siteid)
 
     # set up logs
-    log_dict = {}
-    log_dict['Fsun'] = Fsun
-    log_dict['Rb'] = Rb
-    log_dict['base_resolution'] = base_resolution
-    log_dict['tif_path'] = f'{indir}{siteid}_GLDELEV_001.tif' # _final_adj_5mpp_surf.tif'
-    log_dict['outdir'] = f"{root}out/"
-    log_dict['start_time'] = start_time
-    log_dict['end_time'] = end_time
-    log_dict['time_step_hours'] = time_step_hours
-    log_dict['runtime_sec'] = round(time.time() - start, 2)
-    with open(f"{outdir}illum_stats_{siteid}_{int(time.time())}", "w") as fp:
-        json.dump(log_dict, fp, indent=4)
+    run_log(Fsun=Fsun, Rb=Rb, base_resolution=base_resolution, siteid=siteid, dem_path=dem_path, outdir=outdir,
+            start_time=opt.start_time, end_time=opt.end_time, time_step_hours=opt.time_step_hours,
+            runtime_sec=round(time.time() - start, 2), logpath=f"{outdir}illum_stats_{siteid}_{int(time.time())}.json")
 
 

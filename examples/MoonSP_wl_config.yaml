@@ -1,0 +1,13 @@
+base_resolution: 2
+max_extension: 40e3
+root: "examples/"
+indir: "examples/aux/"
+#dem_path: f'{indir}{siteid}_GLDELEV_001.tif' # _final_adj_5mpp_surf.tif'  #
+#fartopo_path: ""
+outdir: "examples/out/"
+tmpdir: "examples/tmp/"
+start_time: datetime.datetime(2026, 1, 30, hour=15)
+end_time: datetime.datetime(2025, 9, 21, hour=16)
+time_step_hours: 1
+flux_path: "examples/aux/ref_solar_irradiance_whi-2008_ver2.dat"
+wavelength: [0, 320]
