@@ -120,7 +120,6 @@ def make(base_resolution, decimation_rates, tif_path, out_path, mesh_ext='.xmf',
         for coord_style in ["stereo", "cart"]:
 
             if coord_style == "cart":
-
                 lon, lat = unproject_stereographic(mesh_versions[decimation]['V'][:, 0],
                                                    mesh_versions[decimation]['V'][:, 1], lonlat0[0], lonlat0[1],
                                                    R=plarad) # + mesh_versions[decimation]['V'][:, 2])

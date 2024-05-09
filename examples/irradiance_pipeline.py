@@ -15,35 +15,31 @@ from src.config import ShSpOpt
 from src.mesh_operations import mesh_generation
 from src.mesh_operations.helpers import prepare_inner_outer_mesh
 from src.shadowspy.flux_util import get_Fsun
-from src.shadowspy.image_util import read_img_properties
 from src.shadowspy.raster_products import basic_raster_stats
-from src.shadowspy.render_dem import irradiance_at_date, render_match_image
+from src.shadowspy.render_dem import irradiance_at_date
 from src.shadowspy.utilities import run_log
 
-def rendering_pipeline():
-    # compute direct flux from the Sun
+def main_pipeline():
 
     start = time.time()
 
-    opt = ShSpOpt()
-    opt.setup_config()
-
-    # set local vars (backward compatibility)
-    siteid = opt.siteid
-    Rb = opt.Rb
-    base_resolution = opt.base_resolution
-    max_extension = float(opt.max_extension)
-    extres = {float(k):int(v) for k, v in opt.extres.items()}
-    root = opt.root
-    indir = opt.indir
-    dem_path = opt.dem_path
-
-    fartopo_path = opt.fartopo_path if opt.fartopo_path not in ['None', 'same_dem'] \
-        else dem_path if opt.fartopo_path == 'same_dem' \
-        else None
-
-    outdir = opt.outdir
-    tmpdir = opt.tmpdir
+    def get_config(opt):
+        settings = {
+            'siteid': opt.siteid,
+            'Rb': opt.Rb,
+            'base_resolution': opt.base_resolution,
+            'max_extension': float(opt.max_extension),
+            'extres': {float(k): int(v) for k, v in opt.extres.items()},
+            'root': opt.root,
+            'indir': opt.indir,
+            'dem_path': opt.dem_path,
+            'fartopo_path': opt.fartopo_path if opt.fartopo_path not in ['None', 'same_dem']
+            else opt.dem_path if opt.fartopo_path == 'same_dem'
+            else None,
+            'outdir': opt.outdir,
+            'tmpdir': opt.tmpdir,
+        }
+        return settings
     use_azi_ele = False
 
     # download kernels
@@ -102,22 +98,25 @@ def rendering_pipeline():
     # Determine the mode and prepare data list
     if opt.azi_ele_path not in [None, 'None']:
         use_azi_ele = True
-        data_list = pd.read_csv(opt.azi_ele_path).tolist()
+
+        if not opt.point_source:
+            logging.error("* Can only provide azimuth&elevation when using a point source.")
+            exit()
+
+        data_list = pd.read_csv(opt.azi_ele_path).values.tolist()
+        print(data_list)
+
+    elif len(opt.epos_utc) > 0:
+        data_list = opt.epos_utc
+
     else:
         use_azi_ele = False
-        images_index = opt.images_index
-        cumindex = pd.read_csv(images_index, index_col=None)
-
-        # get list of images from mapprojected folder
-        imgs_nam_epo_path = read_img_properties(images_index.image_name, cumindex)
-
-        data_list['meas_path'] = [f"{indir}{img}_map.tif"
-                                          for img in imgs_nam_epo_path.PRODUCT_ID.values]
-    print(f"- Rendering input DEM at {data_list}.")
-
-    # open index to get images info
-
-    print(f"- {len(imgs_nam_epo_path)} images found in path. Rendering input DEM.")
+        start_time = datetime.datetime.strptime(opt.start_time, '%Y-%m-%d %H:%M:%S.%f')
+        end_time = datetime.datetime.strptime(opt.end_time, '%Y-%m-%d %H:%M:%S.%f')
+        s = pd.Series(pd.date_range(start_time, end_time, freq=f'{opt.time_step_hours}H')
+                      .strftime('%Y-%m-%d %H:%M:%S.%f'))
+        data_list = s.values.tolist()
+    print(f"- Illuminating input DEM at {data_list}.")
 
     # actually compute irradiance at each element of data_list
     dsi_epo_path_dict = {}
@@ -125,9 +124,16 @@ def rendering_pipeline():
 
         if use_azi_ele:
             # For azimuth-elevation inputs
-            func_args = {'azi_ele': data}
+            func_args = {'azi_ele_deg': data}
+            epo_in = '2000-01-01 00:00:00.0'
         else:
-            func_args = {'img_name': data[0], 'epo_utc': data[1], 'meas_path': data[2]}
+            func_args = {'epo_utc': data}
+            epo_in = data
+
+        if opt.flux_path is None:
+            Fsun = get_Fsun(opt.flux_path, epo_in, wavelength=opt.wavelength)
+        else:
+            Fsun = opt.Fsun
 
         # Common arguments for both cases
         common_args = {
@@ -137,14 +143,52 @@ def rendering_pipeline():
             'point': opt.point_source,
             'extsource_coord': opt.extsource_coord,
             'source': opt.source,
-            'inc_flux': opt.Fsun,
+            'inc_flux': Fsun,
         }
 
         # Call the function with dynamically constructed arguments
         full_args = {**common_args, **func_args}
-        render_match_image(**full_args)
+        dsi, epo_out = irradiance_at_date(**full_args)
 
+        # get illum epoch string
+        epostr = datetime.datetime.strptime(epo_in, '%Y-%m-%d %H:%M:%S.%f')
+        epostr = epostr.strftime('%y%m%d%H%M%S')
+
+        # define useful quantities
+        outpath = f"{outdir}{siteid}/{siteid}_{epostr}_{idx}"
+        dsi_epo_path_dict[epostr] = outpath+'.tif'
+
+        # save each output to raster to save memory
+        dsi.rio.write_crs(dem_crs, inplace=True)
+        dsi = dsi.assign_coords(time=epo_in)
+        dsi = dsi.expand_dims(dim="time")
+        dsi = dsi.rio.reproject_match(dem, resampling=Resampling.cubic_spline)
+        dsi.flux.rio.to_raster(f"{outpath}.tif", compress='zstd')
+
+    # prepare mean, sum, max stats rasters
+    if not use_azi_ele:
+        basic_raster_stats(dsi_epo_path_dict, opt.time_step_hours, crs=dem_crs, outdir=outdir, siteid=siteid)
+
+    # set up logs
+    run_log(Fsun=Fsun, Rb=Rb, base_resolution=base_resolution, siteid=siteid, dem_path=dem_path, outdir=outdir,
+            start_time=opt.start_time, end_time=opt.end_time, time_step_hours=opt.time_step_hours,
+            runtime_sec=round(time.time() - start, 2), logpath=f"{outdir}illum_stats_{siteid}_{int(time.time())}.json")
+
+# def main_pipeline(opt, process_function):
+#     start = time.time()
+#     setup_directories(opt.root, opt.outdir, opt.tmpdir, opt.siteid)
+#     meshpath = prepare_dem_mesh(opt.dem_path, opt.tmpdir, opt.siteid, opt)
+#
+#     use_azi_ele = opt.azi_ele_path not in [None, 'None']
+#     data_list = fetch_and_process_data(opt, use_azi_ele)
+#
+#     common_args = setup_common_args(meshpath, opt)
+#     process_function(data_list, common_args, use_azi_ele, opt)
+#
+#     print(f"Completed in {round(time.time() - start, 2)} seconds.")
 
 if __name__ == '__main__':
 
-    rendering_pipeline()
+    opt = ShSpOpt()
+    opt.setup_config()
+    main_pipeline(opt, process_data_list)

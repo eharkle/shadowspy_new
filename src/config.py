@@ -4,9 +4,9 @@ import os
 from importlib import resources
 import yaml
 
-from src.shadowspy.utils import load_config_yaml
+from src.shadowspy.utilities import load_config_yaml
 
-logging.basicConfig(level=logging.WARN)
+logging.basicConfig(level=logging.INFO)
 
 class ShSpOpt:
 

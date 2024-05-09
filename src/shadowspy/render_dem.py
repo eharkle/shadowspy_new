@@ -161,11 +161,16 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
     @param return_irradiance:
     @return:
     """
-    input_YYMMGGHHMMSS = datetime.strptime(epo_utc.strip(), '%Y-%m-%d %H:%M:%S.%f')
-    format_code = '%Y%m%d%H%M%S'
-    date_illum_str = input_YYMMGGHHMMSS.strftime(format_code)
-    format_code = '%Y %m %d %H:%M:%S'
-    date_illum_spice = input_YYMMGGHHMMSS.strftime(format_code)
+
+    if azi_ele_deg is None:
+        input_YYMMGGHHMMSS = datetime.strptime(epo_utc.strip(), '%Y-%m-%d %H:%M:%S.%f')
+        format_code = '%Y%m%d%H%M%S'
+        date_illum_str = input_YYMMGGHHMMSS.strftime(format_code)
+        format_code = '%Y %m %d %H:%M:%S'
+        date_illum_spice = input_YYMMGGHHMMSS.strftime(format_code)
+    else:
+        date_illum_str = None
+        date_illum_spice = None
 
     # check if DEM needs to be cropped (e.g., to fit image)
     if isinstance(dem_mask, gpd.GeoDataFrame):
@@ -240,8 +245,9 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
     return dsi, date_illum_str
 
 
-def irradiance_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_mask=None, source='SUN',
-                       inc_flux=1361, basemesh_path=None, show=False, point=True, return_irradiance=True):
+def irradiance_at_date(meshes, path_to_furnsh, center='P', crs=None, dem_mask=None, source='SUN',
+                       inc_flux=1361, basemesh_path=None, show=False, point=True, extsource_coord=None,
+                       epo_utc=None, azi_ele_deg=None):
     """
     Get terrain irradiance at epoch
     :param inc_flux:
@@ -259,11 +265,11 @@ def irradiance_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, de
     :param return_irradiance: bool, must be True
     :return:
     """
-    if not return_irradiance:
-        logging.error("* Either set return_irradiance=True, or else call render_at_date.")
+    # if not return_irradiance:
+    #     logging.error("* Either set return_irradiance=True, or else call render_at_date.")
 
     return render_at_date(meshes, epo_utc, path_to_furnsh, center, crs, dem_mask, source, inc_flux, basemesh_path, show,
-                          point, azi_ele_deg=None, return_irradiance=return_irradiance)
+                          point, azi_ele_deg=azi_ele_deg, extsource_coord=extsource_coord, return_irradiance=True)
 
 
 def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
@@ -353,6 +359,7 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
     outraster = f"{outdir}{img_name}_{date_illum_str}.tif"
     rendering.transpose('y', 'x').rio.to_raster(outraster)
 
-    print(f"- Flux for {img_name} saved to {outraster} (xy resolution = {rendering.rio.resolution()}mpp). Normalized by {exposure_factor}.")
+    print(f"- Flux for {img_name} saved to {outraster} (xy resolution = {rendering.rio.resolution()}mpp). "
+          f"Normalized by {exposure_factor}.")
 
     return outraster

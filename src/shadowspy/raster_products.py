@@ -9,7 +9,9 @@ def basic_raster_stats(epo_path_dict, time_step_hours, crs, outdir='.', siteid='
 
     # load and stack dataarrays from list
     list_da = []
-    for idx, epo, dsi_path in tqdm(enumerate(epo_path_dict.items()), total=len(epo_path_dict)):
+    for idx, (epo, dsi_path) in tqdm(enumerate(epo_path_dict.items()), total=len(epo_path_dict)):
+
+        print(idx, epo, dsi_path)
         da = xr.open_dataset(dsi_path)
         da = da.assign_coords(time=epo)
         da = da.expand_dims(dim="time")

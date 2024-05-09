@@ -5,7 +5,7 @@ import subprocess
 # Download the spice kernels needed
 # NOTE: At the moment this script works if either wget or curl are installed in the system
 
-def download_kernels():
+def download_kernels(kernels_dir="kernels/"):
 
     # From PDS
     todownload = ['spk/de421.bsp',
@@ -18,7 +18,7 @@ def download_kernels():
 
     for f in todownload:
         fname = os.path.basename(f)
-        if not os.path.exists(f'examples/kernels/{fname}'):
+        if not os.path.exists(f'{kernels_dir}{fname}'):
             try:
                 subprocess.run(
                     f'wget -P examples/kernels/  https://naif.jpl.nasa.gov/pub/naif/pds/data/lro-l-spice-6-v1.0/lrosp_1000/data/{f}',

@@ -1,3 +1,4 @@
+import logging
 import shutil
 
 import numpy as np
@@ -34,7 +35,7 @@ def prepare_inner_outer_mesh(tif_path, fartopo_path, extres, max_extension, Rb, 
     demcx, demcy = np.mean([bounds[0], bounds[2]]), np.mean([bounds[1], bounds[3]])
 
     da_out = xr.open_dataarray(fartopo_path)
-    min_resolution = int(round(da_out.rio.resolution()[0],0))
+    min_resolution = int(round(da_out.rio.resolution()[0], 0))
 
     # Merge inner and outer meshes seamlessly
     # set a couple of layers at 1, 5 and max_extension km ranges
@@ -42,12 +43,24 @@ def prepare_inner_outer_mesh(tif_path, fartopo_path, extres, max_extension, Rb, 
     extres = {ext: max(res, min_resolution) for ext, res in extres.items()
               if ext < max_extension}
     for extension, resol in tqdm(extres.items(), total=len(list(extres.keys())), desc='crop_outer'):
-        da_red = da_out.rio.clip_box(minx=demcx-extension, miny=demcy-extension,
-                             maxx=demcx+extension, maxy=demcy+extension)
-        fartopo_path = f"{tmpdir}LDEM_{int(round(extension,0))}M_outer.tif"
-        fartopomesh = fartopo_path.split('.')[0]
+
+        minx_outer = demcx - extension
+        miny_outer = demcy - extension
+        maxx_outer = demcx + extension
+        maxy_outer = demcy + extension
+
+        # check that the outer mesh is not fully contained in the inner mesh/RoI
+        if (abs(minx_outer) < abs(bounds[0]) and abs(miny_outer) < abs(bounds[1]) and
+                abs(maxx_outer) < abs(bounds[2]) and abs(maxy_outer) < abs(bounds[2])):
+            logging.info(f"Skipping outer mesh for {extension}:{resol} as it falls fully inside RoI.")
+            continue
+
+        da_red = da_out.rio.clip_box(minx=minx_outer, miny=miny_outer,
+                                     maxx=maxx_outer, maxy=maxy_outer)
+        fartopo_path = f"{tmpdir}LDEM_{int(round(extension, 0))}M_outer.tif"
+        fartopomesh = fartopo_path.split('.tif')[0]
         da_red.rio.to_raster(fartopo_path)
-        outer_topos.append({resol: f"{tmpdir}LDEM_{int(round(extension,0))}M_outer.tif"})
+        outer_topos.append({resol: f"{tmpdir}LDEM_{int(round(extension, 0))}M_outer.tif"})
 
     # for iter 0, set inner mesh as stacked mesh
     shutil.copy(f"{meshpath}_st{ext}", f"{tmpdir}stacked_st{ext}")
@@ -58,7 +71,7 @@ def prepare_inner_outer_mesh(tif_path, fartopo_path, extres, max_extension, Rb, 
 
         outer_mesh_resolution = resol
         fartopo_path = dempath
-        fartopomesh = fartopo_path.split('.')[0]
+        fartopomesh = fartopo_path.split('.tif')[0]
 
         print(f"- Adding {fartopo_path} ({fartopomesh}) at {outer_mesh_resolution}mpp.")
 

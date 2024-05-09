@@ -14,3 +14,4 @@ examples/*tar.gz
 examples/aux/*.ply
 build
 shadow-env
+/examples/tmp/

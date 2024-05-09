@@ -1,6 +1,6 @@
 \begindata
 
-   PATH_VALUES     = ( 'examples/kernels' )
+   PATH_VALUES     = ( 'kernels' )
 
    PATH_SYMBOLS    = ( 'KERNELS_COMMON'   )
 
