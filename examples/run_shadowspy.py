@@ -12,25 +12,24 @@ from src.shadowspy.utilities import run_log
 
 def main_pipeline(opt):
 
-    start = time.time()
+    start_glb = time.time()
 
     # download kernels
     if opt.download_kernels:
         download_kernels()
 
+    # prepare useful dirs
     setup_directories(opt)
 
     # prepare mesh of the input dem
     start = time.time()
-    print(f"- Computing trimesh for {opt.dem_path}...")
+    logging.info(f"- Computing trimesh for {opt.dem_path}...")
     inner_mesh_path, outer_mesh_path, dem_path = prepare_dem_mesh(opt.dem_path, opt.tmpdir, opt.siteid, opt)
-    print(f"- Meshes generated after {round(time.time() - start, 2)} seconds.")
+    logging.info(f"- Meshes generated after {round(time.time() - start, 2)} seconds.")
 
     # Determine the mode and prepare data list
-    data_list, use_azi_ele = fetch_and_process_data(opt)
-    print(f"- Illuminating input DEM at {data_list}.")
-    print(data_list)
-    exit()
+    data_list, use_azi_ele, use_image_times = fetch_and_process_data(opt)
+    logging.info(f"- Illuminating input DEM at {data_list}.")
 
     # Common arguments for both cases
     common_args = {
@@ -44,7 +43,7 @@ def main_pipeline(opt):
     }
 
     # actually compute irradiance at each element of data_list
-    dsi_epo_path_dict = process_data_list(data_list, common_args, use_azi_ele, opt)
+    dsi_epo_path_dict = process_data_list(data_list, common_args, use_azi_ele, use_image_times, opt)
 
     # prepare mean, sum, max stats rasters
     if not use_azi_ele:
@@ -54,9 +53,9 @@ def main_pipeline(opt):
     # set up logs
     run_log(Fsun=opt.Fsun, Rb=opt.Rb, base_resolution=opt.base_resolution, siteid=opt.siteid, dem_path=dem_path, outdir=opt.outdir,
             start_time=opt.start_time, end_time=opt.end_time, time_step_hours=opt.time_step_hours,
-            runtime_sec=round(time.time() - start, 2), logpath=f"{opt.outdir}illum_stats_{opt.siteid}_{int(time.time())}.json")
+            runtime_sec=round(time.time() - start_glb, 2), logpath=f"{opt.outdir}illum_stats_{opt.siteid}_{int(time.time())}.json")
 
-    print(f"Completed in {round(time.time() - start, 2)} seconds.")
+    logging.info(f"Completed in {round(time.time() - start_glb, 2)} seconds.")
 
 if __name__ == '__main__':
 

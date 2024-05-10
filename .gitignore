@@ -15,3 +15,4 @@ examples/aux/*.ply
 build
 shadow-env
 /examples/tmp/
+*.pclprof

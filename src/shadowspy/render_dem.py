@@ -273,7 +273,7 @@ def irradiance_at_date(meshes, path_to_furnsh, center='P', crs=None, dem_mask=No
 
 
 def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
-                       meas_path, outdir=None, center='P', basemesh=None, point=True):
+                       meas_path, outdir=None, center='P', basemesh_path=None, point=True, **kwargs):
     """
     Render input terrain at epoch and match observed flux to input image
     :param pdir:
@@ -293,9 +293,9 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
         outdir = f"{pdir}out/"
     os.makedirs(outdir, exist_ok=True)
 
-    if not basemesh is None:
+    if not basemesh_path is None:
         logging.warning("* Outer mesh not yet implemented for render_match_image. Setting back to None.")
-        basemesh = None
+        basemesh_path = None
     
     # interpolate to NAC nodes
     meas = xr.open_dataarray(meas_path)
@@ -314,7 +314,7 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
 
     # get full rendering at date
     dsi, date_illum_str = render_at_date(meshes, epo_utc, path_to_furnsh, center=center, crs=meas.rio.crs,
-                                         dem_mask=meas_outer_poly, basemesh_path=basemesh, point=point)
+                                         dem_mask=meas_outer_poly, basemesh_path=basemesh_path, point=point)
 
     # interp to measured image coordinates
     rendering = dsi.rio.reproject_match(meas, Resampling=Resampling.bilinear,
