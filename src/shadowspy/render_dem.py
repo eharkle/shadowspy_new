@@ -247,7 +247,7 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
 
 def irradiance_at_date(meshes, path_to_furnsh, center='P', crs=None, dem_mask=None, source='SUN',
                        inc_flux=1361, basemesh_path=None, show=False, point=True, extsource_coord=None,
-                       epo_utc=None, azi_ele_deg=None):
+                       epo_utc=None, azi_ele_deg=None, **kwargs):
     """
     Get terrain irradiance at epoch
     :param inc_flux:

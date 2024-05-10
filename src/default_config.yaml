@@ -16,13 +16,19 @@ extres: {20e3: 60, 60e3: 120, 100e3: 240, 300e3: 480}
 lonlat0_stereo: [0, -90] # tuple are not parsed correctly, use lists
 bbox_roi: null
 shapefile_roi: null # (minx, miny, maxx, maxy)
+mesh_ext: '.vtk'
 
 # epochs
+# ------
 epos_utc: [] # ['2023-09-29 06:00:00.0']
 start_time: null # datetime.datetime(2026, 1, 30, hour=15)
 end_time: null # datetime.datetime(2025, 9, 21, hour=16)
 time_step_hours: 24
 azi_ele_path: None # see 'aux/template_azi_ele.csv'
+
+# images
+# ------
+images_index: None #
 
 # raytracing options
 # ------------------
