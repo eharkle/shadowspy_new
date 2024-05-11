@@ -11,7 +11,6 @@ def basic_raster_stats(epo_path_dict, time_step_hours, crs, outdir='.', siteid='
     list_da = []
     for idx, (epo, dsi_path) in tqdm(enumerate(epo_path_dict.items()), total=len(epo_path_dict)):
 
-        print(idx, epo, dsi_path)
         da = xr.open_dataset(dsi_path)
         da = da.assign_coords(time=epo)
         da = da.expand_dims(dim="time")
@@ -22,7 +21,6 @@ def basic_raster_stats(epo_path_dict, time_step_hours, crs, outdir='.', siteid='
     ds = xr.combine_by_coords(list_da)
     moon_sp_crs = crs
     ds.rio.write_crs(moon_sp_crs, inplace=True)
-    print(ds)
 
     # get cumulative flux (assuming 24H steps for now)
     step_sec = time_step_hours * 3600.
@@ -33,10 +31,14 @@ def basic_raster_stats(epo_path_dict, time_step_hours, crs, outdir='.', siteid='
     dsmean = ds.mean(dim='time')
 
     # save to raster
-    format_code = '%Y%m%d%H%M%S'
     epos_utc = list(epo_path_dict.keys())
-    start_time = epos_utc[0].strftime(format_code)
-    end_time = epos_utc[-1].strftime(format_code)
+    try:
+        start_time = str(epos_utc[0])
+        end_time = str(epos_utc[-1])
+    except:
+        format_code = '%Y%m%d%H%M%S'
+        start_time = epos_utc[0].strftime(format_code)
+        end_time = epos_utc[-1].strftime(format_code)
 
     sumout = f"{outdir}{siteid}_sum_{start_time}_{end_time}.tif"
     dssum.flux.rio.to_raster(sumout)

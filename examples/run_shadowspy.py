@@ -39,7 +39,7 @@ def main_pipeline(opt):
         'point': opt.point_source,
         'extsource_coord': opt.extsource_coord,
         'source': opt.source,
-        'dem_path': opt.dem_path,
+        'dem_path': dem_path,
     }
 
     # actually compute irradiance at each element of data_list
