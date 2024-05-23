@@ -4,12 +4,14 @@ import shutil
 import pandas as pd
 import xarray as xr
 import rioxarray
+# from line_profiler_pycharm import profile
 from shapely.geometry import box
 import logging
 
 from src.mesh_operations import mesh_generation
 from src.mesh_operations.helpers import prepare_inner_outer_mesh
 
+#@profile
 def prepare_dem_mesh(dem_path, tmpdir, siteid, opt):
     dem = xr.open_dataarray(dem_path)
     ext = opt.mesh_ext
@@ -18,7 +20,7 @@ def prepare_dem_mesh(dem_path, tmpdir, siteid, opt):
         minx, miny, maxx, maxy = opt.bbox_roi
         bbox_str = f"{minx}_{miny}_{maxx}_{maxy}"
         clipped_dem_path = f"{tmpdir}clipped_dem_{siteid}_{bbox_str}.tif"
-        dem.rio.clip([box(minx, miny, maxx, maxy)]).rio.to_raster(clipped_dem_path)
+        dem.rio.clip([box(minx, miny, maxx, maxy)]).rio.to_raster(clipped_dem_path) # 91% of time spent here (when gen_mesh not called)
         dem_path = clipped_dem_path
         logging.info(f"Clipped {opt.dem_path} to {bbox_str} and saved to {dem_path}")
 
@@ -48,6 +50,7 @@ def generate_outer_mesh(dem_path, meshpath, tmpdir, ext, opt):
     if fartopo_path is not None:
         len_inner_faces_path = f'{tmpdir}len_inner_faces.txt'
         if os.path.exists(len_inner_faces_path):
+            logging.info(f"- Reading existing stacked mesh file")
             last_ext = max({ext: res for ext, res in extres.items() if ext < max_extension}.keys())
             len_inner_faces = pd.read_csv(len_inner_faces_path, header=None).values[0][0]
             inner_mesh_path = meshpath

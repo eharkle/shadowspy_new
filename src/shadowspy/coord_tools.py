@@ -1,4 +1,5 @@
 import numpy as np
+import pyproj
 
 def sph2cart(r, lat, lon):
     """
@@ -135,6 +136,63 @@ def compute_azimuth_elevation(observer_lat, observer_lon, observer_alt, target_p
     return azimuth_deg, elevation_deg
 
 
+def map_projection_to_azimuth(observer_lat, observer_lon, direction_or_angle, proj_wkt):
+    """
+    Converts a map projection direction to an azimuth angle considering the observer's latitude and longitude
+    in a south polar stereographic projection.
+
+    :param observer_lat: Latitude of the observer in degrees
+    :param observer_lon: Longitude of the observer in degrees
+    :param direction: Direction as a string ('right', 'up', 'left', 'down')
+    :param proj_wkt: The Well-Known Text (WKT) string defining the projection
+    :return: Azimuth angle in degrees
+    """
+    # Define the projection using pyproj
+    proj = pyproj.CRS.from_wkt(proj_wkt)
+    transformer_to_proj = pyproj.Transformer.from_crs(proj.geodetic_crs, proj, always_xy=True)
+    transformer_to_geodetic = pyproj.Transformer.from_crs(proj, proj.geodetic_crs, always_xy=True)
+
+    # Extract the ellipsoid parameters from the WKT
+    if proj.ellipsoid.inverse_flattening != 0:
+        geod = pyproj.Geod(a=proj.ellipsoid.semi_major_metre, rf=1 / proj.ellipsoid.inverse_flattening)
+    else:
+        geod = pyproj.Geod(a=proj.ellipsoid.semi_major_metre)
+
+    # Convert the observer's lat/lon to the projection coordinates
+    obs_x, obs_y = transformer_to_proj.transform(observer_lon, observer_lat)
+
+    # Define unit vectors in the direction of 'right', 'up', 'left', 'down' in the projection
+    if isinstance(direction_or_angle, str):
+        # Define the azimuth angle based on the direction
+        direction_mapping = {
+            'right': 90,
+            'up': 0,
+            'left': 270,
+            'down': 180
+        }
+        azimuth_angle = direction_mapping.get(direction_or_angle.lower())
+        if azimuth_angle is None:
+            raise ValueError("Invalid direction. Use 'right', 'up', 'left', or 'down'.")
+    else:
+        azimuth_angle = direction_or_angle
+
+    # Calculate target point based on azimuth angle
+    azimuth_rad = np.radians(azimuth_angle)
+    target_x = obs_x + np.sin(azimuth_rad)
+    target_y = obs_y + np.cos(azimuth_rad)
+
+    # Convert the target point back to geographic coordinates
+    target_lon, target_lat = transformer_to_geodetic.transform(target_x, target_y)
+
+    # Calculate the azimuth from the observer to the target point
+    _, azimuth, _ = geod.inv(observer_lon, observer_lat, target_lon, target_lat)
+
+    # Normalize the azimuth to be within [0, 360) degrees
+    azimuth = azimuth % 360
+
+    return azimuth
+
+
 def azimuth_elevation_to_cartesian(azimuth_deg, elevation_deg, distance, observer_lat, observer_lon, observer_alt):
     """
     Converts azimuth and elevation angles back to Cartesian coordinates in the ECEF system.
@@ -186,3 +244,19 @@ def azimuth_elevation_to_cartesian(azimuth_deg, elevation_deg, distance, observe
     return target_pos_ecef
 
 
+if __name__ == '__main__':
+
+
+    # Example usage:
+    direction = 0  # 'right', 'up', 'left', or 'down'
+    elevation_deg = 45.0
+    distance = 100000
+    observer_lat = -85
+    observer_lon = 0
+    observer_alt = 0
+    proj_wkt = 'PROJCS["Moon (2015) - Sphere / Ocentric / South Polar", BASEGEOGCRS["Moon (2015) - Sphere / Ocentric", DATUM["Moon (2015) - Sphere", ELLIPSOID["Moon (2015) - Sphere",1737400,0, LENGTHUNIT["metre",1]]], PRIMEM["Reference Meridian",0, ANGLEUNIT["degree",0.0174532925199433]], ID["IAU",30100,2015]], CONVERSION["South Polar", METHOD["Polar Stereographic (variant A)", ID["EPSG",9810]], PARAMETER["Latitude of natural origin",-90, ANGLEUNIT["degree",0.0174532925199433], ID["EPSG",8801]], PARAMETER["Longitude of natural origin",0, ANGLEUNIT["degree",0.0174532925199433], ID["EPSG",8802]], PARAMETER["Scale factor at natural origin",1, SCALEUNIT["unity",1], ID["EPSG",8805]], PARAMETER["False easting",0, LENGTHUNIT["metre",1], ID["EPSG",8806]], PARAMETER["False northing",0, LENGTHUNIT["metre",1], ID["EPSG",8807]]], CS[Cartesian,2], AXIS["(E)",east,ORDER[1],LENGTHUNIT["metre",1]], AXIS["(N)",north, ORDER[2], LENGTHUNIT["metre",1]], ID["IAU",30135,2015]]'
+
+    azimuth_deg = map_projection_to_azimuth(observer_lat, observer_lon, direction, proj_wkt)
+    print(azimuth_deg)
+    _ = azimuth_elevation_to_cartesian(azimuth_deg, elevation_deg, distance, observer_lat, observer_lon, observer_alt)
+    print(_)

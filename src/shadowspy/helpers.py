@@ -4,12 +4,13 @@ import datetime
 import xarray as xr
 import rioxarray
 import pandas as pd
+# from line_profiler_pycharm import profile
 from rasterio._io import Resampling
 from tqdm import tqdm
 
 from src.shadowspy.flux_util import get_Fsun
 from src.shadowspy.image_util import read_img_properties
-from src.shadowspy.render_dem import irradiance_at_date, render_match_image
+from src.shadowspy.render_dem import irradiance_at_date, render_match_image, render_at_date
 
 
 def setup_directories(opt):
@@ -18,7 +19,7 @@ def setup_directories(opt):
     os.makedirs(f"{opt.outdir}{opt.siteid}/", exist_ok=True)
     os.makedirs(opt.tmpdir, exist_ok=True)
 
-
+#@profile
 def process_data_list(data_list, common_args, use_azi_ele, use_image_times, opt):
     dsi_epo_path_dict = {}
     dem = xr.open_dataarray(common_args['dem_path'])
@@ -26,12 +27,19 @@ def process_data_list(data_list, common_args, use_azi_ele, use_image_times, opt)
     for data in tqdm(data_list, total=len(data_list)):
         common_args, func_args = prepare_processing(use_azi_ele, use_image_times, data, common_args, opt)
         full_args = {**common_args, **func_args}
-        if use_image_times:
-            dsi_path = render_match_image(**full_args)
-            dsi_epo_path_dict[func_args['epo_in']] = dsi_path
-        else:
+
+        if opt.irradiance_only:
             dsi, date_illum_str = irradiance_at_date(**full_args)
-            dump_processing_results(dsi, dsi_epo_path_dict, dem, func_args, opt)
+            key, value = dump_processing_results(dsi, dem, func_args, opt)
+            dsi_epo_path_dict[key] = value
+        else:
+            if use_image_times:
+                dsi_path = render_match_image(**full_args)
+                dsi_epo_path_dict[func_args['epo_in']] = dsi_path
+            else:
+                dsi, date_illum_str = render_at_date(**full_args)
+                key, value = dump_processing_results(dsi, dem, func_args, opt)
+                dsi_epo_path_dict[key] = value
 
     return dsi_epo_path_dict
 
@@ -54,8 +62,8 @@ def prepare_processing(use_azi_ele, use_image_times, data, common_args, opt):
 
     return common_args, func_args
 
-
-def dump_processing_results(dsi, dsi_epo_path_dict, dem, func_args, opt):
+#@profile
+def dump_processing_results(dsi, dem, func_args, opt):
     # get illum epoch string
     try:
         epostr = f"{func_args['azi_ele_deg'][0]}_{func_args['azi_ele_deg'][1]}"
@@ -64,12 +72,13 @@ def dump_processing_results(dsi, dsi_epo_path_dict, dem, func_args, opt):
         epostr = epostr.strftime('%y%m%d%H%M%S')
 
     # define useful quantities
-    outpath = f"{opt.outdir}{opt.siteid}/{opt.siteid}_{epostr}"
-    dsi_epo_path_dict[epostr] = outpath + '.tif'
+    outpath = f"{opt.outdir}{opt.siteid}/{opt.siteid}_{epostr}.tif"
 
     # save each output to raster to save memory
     dsi.rio.write_crs(dem.rio.crs, inplace=True)
     dsi = dsi.assign_coords(time=func_args['epo_in'])
     dsi = dsi.expand_dims(dim="time")
     dsi = dsi.rio.reproject_match(dem, resampling=Resampling.cubic_spline)
-    dsi.flux.rio.to_raster(f"{outpath}.tif", compress='zstd')
+    dsi.flux.rio.to_raster(outpath, compress='zstd')
+
+    return epostr, outpath

@@ -1,6 +1,7 @@
 import logging
 import time
 import xarray as xr
+import pandas as pd
 
 from examples.download_kernels import download_kernels
 from src.config import ShSpOpt
@@ -9,7 +10,9 @@ from src.shadowspy.dem_processing import prepare_dem_mesh
 from src.shadowspy.helpers import setup_directories, process_data_list
 from src.shadowspy.raster_products import basic_raster_stats
 from src.shadowspy.utilities import run_log
+# from line_profiler_pycharm import profile
 
+# @profile
 def main_pipeline(opt):
 
     start_glb = time.time()
@@ -49,6 +52,11 @@ def main_pipeline(opt):
     if not use_azi_ele:
         dem = xr.open_dataarray(common_args['dem_path'])
         basic_raster_stats(dsi_epo_path_dict, opt.time_step_hours, crs=dem.rio.crs, outdir=opt.outdir, siteid=opt.siteid)
+    else:
+        dsi_epo_path = pd.read_csv(f'{opt.outdir}{opt.siteid}/dsi_epo_paths.csv').set_index('Unnamed: 0').to_dict()['0']
+        # dsi_epo_path = {datetime.strptime(str(k), '%Y%m%d%H%M%S'):v for k,v in dsi_epo_path.items()}
+        dem = xr.open_dataarray(common_args['dem_path'])
+        basic_raster_stats(dsi_epo_path, opt.time_step_hours, crs=dem.rio.crs, outdir=opt.outdir, siteid=opt.siteid)
 
     # set up logs
     run_log(Fsun=opt.Fsun, Rb=opt.Rb, base_resolution=opt.base_resolution, siteid=opt.siteid, dem_path=dem_path, outdir=opt.outdir,

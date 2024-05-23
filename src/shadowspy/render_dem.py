@@ -5,8 +5,9 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import geopandas as gpd
+# from line_profiler_pycharm import profile
 
-RAYTRACING_BACKEND = 'cgal' #'embree' #
+RAYTRACING_BACKEND = 'embree' # 'cgal' #
 RAYTRACING_BACKEND = RAYTRACING_BACKEND.lower()
 if RAYTRACING_BACKEND == 'cgal':
     from src.shadowspy.shape import CgalTrimeshShapeModel as MyTrimeshShapeModel
@@ -15,11 +16,12 @@ elif RAYTRACING_BACKEND == 'embree':
         import embree
     except:
         logging.error("* You need to add embree_vars to the PATH to use embree")
+        exit()
     from src.shadowspy.shape import EmbreeTrimeshShapeModel as MyTrimeshShapeModel
 else:
     raise ValueError('RAYTRACING_BACKEND should be one of: "cgal", "embree"')
 
-from src.shadowspy.coord_tools import cart2sph, azimuth_elevation_to_cartesian
+from src.shadowspy.coord_tools import cart2sph, azimuth_elevation_to_cartesian, map_projection_to_azimuth
 from src.mesh_operations.mesh_utils import import_mesh
 from src.mesh_operations.mesh_tools import crop_mesh
 from src.shadowspy.spice_util import get_sourcevec
@@ -70,9 +72,10 @@ def extended_source(sun_vecs, extsource_coord):
     extsun_tiled = np.tile(extsun_, (sun_vecs.shape[0], 1))
     return sun_veccs + Vs * extsun_tiled[:, 0][:, np.newaxis] * Rs + Ws * extsun_tiled[:, 1][:, np.newaxis] * Rs
 
-
+#@profile
 def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN', inc_flux=1361., center='P',
-                     point=True, basemesh=None, return_irradiance=False, azi_ele_deg=None, extsource_coord=None):
+                     point=True, basemesh=None, return_irradiance=False, azi_ele_deg=None, extsource_coord=None,
+                     crs=None):
     if center == 'V':
         C = shape_model.V
         N = shape_model.VN
@@ -88,11 +91,30 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN
                                    path_to_furnsh=path_to_furnsh,
                                    target=source, frame='MOON_ME', observer='MOON')#*1e3
     else:
+        # getting float lat/lon to pass
         latitude_deg, longitude_deg = np.rad2deg(np.vstack(cart2sph(np.mean(C, axis=0)))[1:])
+        latitude_deg = latitude_deg[0]
+        longitude_deg = longitude_deg[0]
+
         logging.warning("- Using source_distance = 1.5e8 km ~ 1AU. Adapt for other bodies.")
-        point_source_vecs = azimuth_elevation_to_cartesian(azimuth_deg=azi_ele_deg[0], elevation_deg=azi_ele_deg[1],
+        # proj_wkt = 'PROJCS["WGS 84 / Antarctic Polar Stereographic",GEOGCS["WGS 84",DATUM["WGS_1984",
+        # SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],
+        # PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],
+        # AUTHORITY["EPSG","4326"]],PROJECTION["Polar_Stereographic"],PARAMETER["latitude_of_origin",-90],
+        # PARAMETER["central_meridian",0],PARAMETER["scale_factor",1],PARAMETER["false_easting",0],
+        # PARAMETER["false_northing",0],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AUTHORITY["EPSG","3031"]]'
+
+        # convert direction to local azimuth to retrieve consistent sun direction
+        if crs is not None:
+            azimuth_deg = map_projection_to_azimuth(latitude_deg, longitude_deg, direction_or_angle=azi_ele_deg[0], proj_wkt=crs)
+            azi_angle_ = int(azimuth_deg)
+        else:
+            logging.warning("- No crs provided. Using input azimuth.")
+            azi_angle_ = azi_ele_deg[0]
+
+        point_source_vecs = azimuth_elevation_to_cartesian(azimuth_deg=azi_angle_, elevation_deg=azi_ele_deg[1],
                                                            distance=1.5e8,
-                                                           observer_lat=latitude_deg[0], observer_lon=longitude_deg[0],
+                                                           observer_lat=latitude_deg, observer_lon=longitude_deg,
                                                            observer_alt=0)
 
     if point:
@@ -140,10 +162,10 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN
     # # compute radiance out of scatterer
     return E * albedo1 * photom1 * np.pi / inc_flux
 
-
-def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_mask=None, source='SUN', inc_flux=1361,
-                   basemesh_path=None, show=False, point=True, azi_ele_deg=None, return_irradiance=False,
-                   extsource_coord=None):
+#@profile
+def render_at_date(meshes, path_to_furnsh, epo_utc=None, center='P', crs=None, dem_mask=None, source='SUN',
+                   inc_flux=1361, basemesh_path=None, show=False, point=True, azi_ele_deg=None, return_irradiance=False,
+                   extsource_coord=None, **kwargs):
     """
     Render terrain at epoch
     @param meshes:
@@ -161,6 +183,8 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
     @param return_irradiance:
     @return:
     """
+
+    date_illum_spice = []
 
     if azi_ele_deg is None:
         input_YYMMGGHHMMSS = datetime.strptime(epo_utc.strip(), '%Y-%m-%d %H:%M:%S.%f')
@@ -205,7 +229,7 @@ def render_at_date(meshes, epo_utc, path_to_furnsh, center='P', crs=None, dem_ma
     flux_at_obs = get_flux_at_date(shape_model, date_illum_spice, path_to_furnsh=path_to_furnsh, source=source,
                                    inc_flux=inc_flux, center=center, point=point, basemesh=basemesh,
                                    return_irradiance=return_irradiance, azi_ele_deg=azi_ele_deg,
-                                   extsource_coord=extsource_coord)
+                                   extsource_coord=extsource_coord, crs=crs)
 
     if show:
         # plot3d(mesh_path=f"{meshes['cart']}", var_to_plot=flux_at_obs)
@@ -268,8 +292,8 @@ def irradiance_at_date(meshes, path_to_furnsh, center='P', crs=None, dem_mask=No
     # if not return_irradiance:
     #     logging.error("* Either set return_irradiance=True, or else call render_at_date.")
 
-    return render_at_date(meshes, epo_utc, path_to_furnsh, center, crs, dem_mask, source, inc_flux, basemesh_path, show,
-                          point, azi_ele_deg=azi_ele_deg, extsource_coord=extsource_coord, return_irradiance=True)
+    return render_at_date(meshes, path_to_furnsh, epo_utc, center, crs, dem_mask, source, inc_flux, basemesh_path, show,
+                          point, azi_ele_deg=azi_ele_deg, return_irradiance=True, extsource_coord=extsource_coord)
 
 
 def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
@@ -313,7 +337,7 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
     meas_outer_poly.set_crs(meas.rio.crs, inplace=True) # both crs should be in km, to be consistent with Sun...
 
     # get full rendering at date
-    dsi, date_illum_str = render_at_date(meshes, epo_utc, path_to_furnsh, center=center, crs=meas.rio.crs,
+    dsi, date_illum_str = render_at_date(meshes, path_to_furnsh, epo_utc, center=center, crs=meas.rio.crs,
                                          dem_mask=meas_outer_poly, basemesh_path=basemesh_path, point=point)
 
     # interp to measured image coordinates

@@ -1,4 +1,4 @@
-base_resolution: 40
+base_resolution: 120
 max_extension: 200e3
 extres: {20e3: 80, 60e3: 120, 100e3: 240, 300e3: 480}
 root: "./"
@@ -14,4 +14,5 @@ bbox_roi: [-10e3, -10e3, -5e3, -5e3] # minx, miny, maxx, maxy
 download_kernels: false
 point_source: true
 extsource_coord: "./aux/coordflux_100pts_outline33_centerlast_R1_F1_stdlimbdark.txt"
-
+irradiance_only: true
+azi_ele_path: "azi_ele_list.in"

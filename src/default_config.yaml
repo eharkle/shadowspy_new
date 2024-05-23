@@ -8,6 +8,7 @@ Rb: 1737.4  # km
 base_resolution: null
 config_file: None
 download_kernels: false
+irradiance_only: false
 
 # meshes
 # ------

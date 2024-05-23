@@ -16,8 +16,8 @@ def fetch_and_process_data(opt):
             logging.error("* Can only provide azimuth&elevation when using a point source.")
             exit()
 
-        data_list = pd.read_csv(opt.azi_ele_path).values.tolist()
-        print(data_list)
+        data_list = pd.read_csv(opt.azi_ele_path, sep=',', dtype='int').values.tolist()
+        logging.info("- Computing illumination from azi/ele:", data_list)
 
     elif opt.images_index not in [None, 'None']:
         use_image_times = True

@@ -1,10 +1,12 @@
 import logging
+
+# from line_profiler_pycharm import profile
 from matplotlib import pyplot as plt
 import xarray as xr
 import rioxarray
 from tqdm import tqdm
 
-
+#@profile
 def basic_raster_stats(epo_path_dict, time_step_hours, crs, outdir='.', siteid='', verbose=True):
 
     # load and stack dataarrays from list
@@ -68,5 +70,5 @@ def basic_raster_stats(epo_path_dict, time_step_hours, crs, outdir='.', siteid='
     axes[2].set_title(r'Mean (J/m$^2$/s)')
     plt.suptitle(f'Statistics of solar flux at {siteid} between {start_time} and {end_time}.')
     pngout = f"{outdir}{siteid}_stats_{start_time}_{end_time}.png"
-    plt.savefig(pngout)
+    plt.savefig(pngout) # 70%+ of time is spent here
     # plt.show()
