@@ -7,11 +7,6 @@ from src.shadowspy.shape import get_centroids
 
 
 def get_uniform_triangle_mesh(xgrid, ygrid, data, decimation=1):
-    # Reduce input data to square set
-    minshp = np.min(data.shape)
-    data = data[:minshp, :minshp]
-    xgrid = xgrid[:minshp]
-    ygrid = ygrid[:minshp]
 
     # decimate as requested
     dem = data[::decimation, ::decimation]
@@ -24,18 +19,18 @@ def get_uniform_triangle_mesh(xgrid, ygrid, data, decimation=1):
                                          np.arange(len(ygrid[::decimation]) - 1))
     index_mesh = np.array([X_idx_mesh.flatten(), Y_idx_mesh.flatten()]).T
 
-    # check that xy dimensions are equal (else meshing fails)
-    assert X_mesh.shape[0] == X_mesh.shape[1]
+    # adapt dimensions to index_mesh XY order
+    X_mesh_shape = (X_mesh.shape[1], X_mesh.shape[0])
 
     # upper triangles
-    ik1 = np.ravel_multi_index([index_mesh[:, 0], index_mesh[:, 1]], dims=X_mesh.shape, order="F")
-    ik2 = np.ravel_multi_index([index_mesh[:, 0] + 1, index_mesh[:, 1] + 1], dims=X_mesh.shape, order="F")
-    ik3 = np.ravel_multi_index([index_mesh[:, 0], index_mesh[:, 1] + 1], dims=X_mesh.shape, order="F")
+    ik1 = np.ravel_multi_index([index_mesh[:, 0], index_mesh[:, 1]], dims=X_mesh_shape, order="F")
+    ik2 = np.ravel_multi_index([index_mesh[:, 0] + 1, index_mesh[:, 1] + 1], dims=X_mesh_shape, order="F")
+    ik3 = np.ravel_multi_index([index_mesh[:, 0], index_mesh[:, 1] + 1], dims=X_mesh_shape, order="F")
     Fu = np.vstack([ik1, ik2, ik3]).T
     # lower triangles
-    ik1 = np.ravel_multi_index([index_mesh[:, 0], index_mesh[:, 1]], dims=X_mesh.shape, order="F")
-    ik2 = np.ravel_multi_index([index_mesh[:, 0] + 1, index_mesh[:, 1]], dims=X_mesh.shape, order="F")
-    ik3 = np.ravel_multi_index([index_mesh[:, 0] + 1, index_mesh[:, 1] + 1], dims=X_mesh.shape, order="F")
+    ik1 = np.ravel_multi_index([index_mesh[:, 0], index_mesh[:, 1]], dims=X_mesh_shape, order="F")
+    ik2 = np.ravel_multi_index([index_mesh[:, 0] + 1, index_mesh[:, 1]], dims=X_mesh_shape, order="F")
+    ik3 = np.ravel_multi_index([index_mesh[:, 0] + 1, index_mesh[:, 1] + 1], dims=X_mesh_shape, order="F")
     Fl = np.vstack([ik1, ik2, ik3]).T
 
     F = np.vstack([Fu, Fl])
@@ -129,22 +124,24 @@ def crop_mesh(polysgdf, meshes, mask, meshes_cropped):
 
     V_st, F_st, N_st, P_st = import_mesh(f"{meshes['stereo']}", get_normals=True, get_centroids=True)
     V, F, N, P = import_mesh(f"{meshes['cart']}", get_normals=True, get_centroids=True)
-    
+
     pointsDF = gpd.GeoDataFrame(geometry=shapely.points(V_st[:, 0], V_st[:, 1]))
+    pointsDF.set_crs(mask.crs, inplace=True)
+
     joinDF = pointsDF.sjoin(mask, how='left', op="within")
     # crop V
     Vcropped_st = V_st[joinDF.dropna(axis=0).index].astype(float)
     Vcropped = V[joinDF.dropna(axis=0).index].astype(float)
+
+    if (len(Vcropped_st) == 0) or (len(Vcropped) == 0):
+        logging.error("* Meshes and mask do not overlap. Weird. Stop")
+        exit()
 
     # covert F idx to new Vcropped
     Vdict = {vold: idx for idx, vold in enumerate(joinDF.dropna(axis=0).index.to_list())}
     Fcropped = np.reshape([*map(Vdict.get, F.ravel())], (-1, 3))
     Fcropped = Fcropped[~np.isnan(Fcropped.astype(float)).any(axis=1)].astype(int)
 
-    if (len(Vcropped_st)==0) or (len(Vcropped)==0):
-        logging.error("* Meshes and mask do not overlap. Weird. Stop")
-        exit()
-        
     # save cropped mesh to file
     mesh = meshio.Mesh(Vcropped_st, [('triangle', Fcropped)])
     mesh.write(f"{meshes_cropped['stereo']}")
