@@ -49,7 +49,7 @@ def prepare_processing(use_azi_ele, use_image_times, data, common_args, opt):
         # For azimuth-elevation inputs
         func_args = {'azi_ele_deg': data, 'epo_in': '2000-01-01 00:00:00.0'}
     elif use_image_times:
-        func_args = {'pdir': opt.root, 'img_name': data[0], 'epo_utc': data[1], 'meas_path': data[2]}
+        func_args = {'pdir': opt.root, 'img_name': data[0], 'epo_utc': data[1], 'epo_in': data[1], 'meas_path': data[2]}
     else:
         func_args = {'epo_utc': data, 'epo_in': data}
 

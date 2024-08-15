@@ -1,6 +1,7 @@
 import os
 import shutil
 
+import matplotlib.pyplot as plt
 import pandas as pd
 import xarray as xr
 import rioxarray
@@ -61,6 +62,8 @@ def generate_outer_mesh(dem_path, meshpath, tmpdir, ext, opt):
                                                                                          meshpath, ext)
             with open(len_inner_faces_path, 'w') as f:
                 f.write('%d' % len_inner_faces)
+        # set full path with ext
+        outer_mesh_path = outer_mesh_path + opt.mesh_ext
     else:
         inner_mesh_path = meshpath
         outer_mesh_path = None

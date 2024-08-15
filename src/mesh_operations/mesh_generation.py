@@ -112,6 +112,7 @@ def make(base_resolution, decimation_rates, tif_path, out_path, mesh_ext='.xmf',
     mesh_versions = {}
     for decimation in decimation_rates:
         start = time.time()
+
         mesh_versions[decimation] = get_uniform_triangle_mesh(xgrid, ygrid, dem, decimation=decimation)
         logging.debug(
             f"- Mesh of shape {mesh_versions[decimation]['shape']} (decimation={decimation}) set up "
