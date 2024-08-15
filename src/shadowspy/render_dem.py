@@ -2,12 +2,13 @@ import logging
 import os
 from datetime import datetime
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import geopandas as gpd
 # from line_profiler_pycharm import profile
 
-RAYTRACING_BACKEND = 'embree' # 'cgal' #
+RAYTRACING_BACKEND = 'cgal' #'embree' #
 RAYTRACING_BACKEND = RAYTRACING_BACKEND.lower()
 if RAYTRACING_BACKEND == 'cgal':
     from src.shadowspy.shape import CgalTrimeshShapeModel as MyTrimeshShapeModel
@@ -201,7 +202,7 @@ def render_at_date(meshes, path_to_furnsh, epo_utc=None, center='P', crs=None, d
 
         # match image/mask and mesh crs
         dem_mask.to_crs(crs, inplace=True)
-        
+
         print(f"- Cropping DEM to {dem_mask}")
         meshes_cropped = {}
         meshes_path = ('/').join(meshes['stereo'].split('/')[:-1])
@@ -344,11 +345,6 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
     rendering = dsi.rio.reproject_match(meas, Resampling=Resampling.bilinear,
                                         nodata=np.nan)
 
-    #dsi.flux.plot(robust=True)
-    #plt.show()
-    #rendering.flux.plot(robust=True)
-    #plt.show()
-    
     # TODO make the threshold an adjustable parameter
     mask = meas.sel({'band': 1}) > 0.005
 

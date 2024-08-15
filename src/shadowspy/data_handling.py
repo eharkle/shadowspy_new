@@ -27,7 +27,7 @@ def fetch_and_process_data(opt):
         data_list = read_img_properties(cumindex, columns=['PRODUCT_ID', 'START_TIME', 'ortho_path'])
         # data_list['meas_path'] = [f"{opt.indir}{img}_map.tif"
         #                                   for img in data_list.PRODUCT_ID.values]
-        data_list = [(row[0], row[1], row[2]) for idx, row in data_list.iterrows()]
+        data_list = [(row[0], row[1].strip(), row[2]) for idx, row in data_list.iterrows()]
 
     elif len(opt.epos_utc) > 0:
         data_list = opt.epos_utc
