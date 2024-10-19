@@ -63,7 +63,7 @@ def generate_outer_mesh(dem_path, meshpath, tmpdir, ext, opt):
             with open(len_inner_faces_path, 'w') as f:
                 f.write('%d' % len_inner_faces)
         # set full path with ext
-        outer_mesh_path = outer_mesh_path + opt.mesh_ext
+        outer_mesh_path = outer_mesh_path + opt.mesh_ext if outer_mesh_path is not None else None
     else:
         inner_mesh_path = meshpath
         outer_mesh_path = None
