@@ -21,9 +21,9 @@ def download_kernels(kernels_dir="kernels/"):
         if not os.path.exists(f'{kernels_dir}{fname}'):
             try:
                 subprocess.run(
-                    f'wget -P examples/kernels/  https://naif.jpl.nasa.gov/pub/naif/pds/data/lro-l-spice-6-v1.0/lrosp_1000/data/{f}',
+                    f'wget -P {kernels_dir}  https://naif.jpl.nasa.gov/pub/naif/pds/data/lro-l-spice-6-v1.0/lrosp_1000/data/{f}',
                     shell=True)
             except:
                 subprocess.run(
-                    f'curl https://naif.jpl.nasa.gov/pub/naif/pds/data/lro-l-spice-6-v1.0/lrosp_1000/data/{f} -o examples/kernels/{fname}',
+                    f'curl https://naif.jpl.nasa.gov/pub/naif/pds/data/lro-l-spice-6-v1.0/lrosp_1000/data/{f} -o {kernels_dir}/{fname}',
                     shell=True)
