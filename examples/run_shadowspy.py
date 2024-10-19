@@ -37,7 +37,7 @@ def main_pipeline(opt):
     # Common arguments for both cases
     common_args = {
         'meshes': {'stereo': f"{inner_mesh_path}_st{opt.mesh_ext}", 'cart': f"{inner_mesh_path}{opt.mesh_ext}"},
-        'basemesh_path': outer_mesh_path + opt.mesh_ext if outer_mesh_path is not None else None,
+        'basemesh_path': outer_mesh_path,
         'path_to_furnsh': f"{opt.indir}simple.furnsh",
         'point': opt.point_source,
         'extsource_coord': opt.extsource_coord,
