@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from datetime import datetime
 
 import matplotlib.pyplot as plt
@@ -98,12 +99,6 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN
         longitude_deg = longitude_deg[0]
 
         logging.warning("- Using source_distance = 1.5e8 km ~ 1AU. Adapt for other bodies.")
-        # proj_wkt = 'PROJCS["WGS 84 / Antarctic Polar Stereographic",GEOGCS["WGS 84",DATUM["WGS_1984",
-        # SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],
-        # PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],
-        # AUTHORITY["EPSG","4326"]],PROJECTION["Polar_Stereographic"],PARAMETER["latitude_of_origin",-90],
-        # PARAMETER["central_meridian",0],PARAMETER["scale_factor",1],PARAMETER["false_easting",0],
-        # PARAMETER["false_northing",0],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AUTHORITY["EPSG","3031"]]'
 
         # convert direction to local azimuth to retrieve consistent sun direction
         if crs is not None:
@@ -139,6 +134,8 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN
 
         sourcedir = source_vecs / np.linalg.norm(source_vecs, axis=1)[:, np.newaxis]
 
+
+
     if center == 'P':
         E = shape_model.get_direct_irradiance(inc_flux, sourcedir, basemesh=basemesh)
     elif center == 'V':
@@ -162,6 +159,40 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN
 
     # # compute radiance out of scatterer
     return E * albedo1 * photom1 * np.pi / inc_flux
+
+def irradiance_with_scattered_flux(shape_model, FF_path, t, D, crs_stereo, out_path):
+    from flux.model import ThermalModel
+    from flux.compressed_form_factors import CompressedFormFactorMatrix
+    from src.mesh_operations.plotting import rasterize_grid
+    import glob
+
+    # if full FF is passed and scattered flux is requested, then...
+    z = np.linspace(0, 3e-3, 31)
+    FF = CompressedFormFactorMatrix.from_file(FF_path)
+    shape_model = FF.shape_model
+
+    thermal_model = ThermalModel(
+        FF, t, D,
+        F0=1365, rho=0.11, method='1mvp',
+        z=z, T0=100, ti=120, rhoc=9.6e5, emiss=0.95,
+        Fgeotherm=0.2, bcond='Q', shape_model=shape_model)
+
+    V = shape_model.V
+    xmin = np.min(V[:, 0])
+    xmax = np.max(V[:, 0])
+    ymin = np.min(V[:, 1])
+    ymax = np.max(V[:, 1])
+    extent = xmin, xmax, ymin, ymax
+
+    for frame_index, (T, E, Qrefl, QIR) in enumerate(thermal_model):
+
+        # Create a dictionary of variables to iterate over (T[:,0] --> analyze/save surface only)
+        variables = {'T': T[:,0], 'E': E, 'Qrefl': Qrefl, 'QIR': QIR}
+
+        # Loop through the dictionary
+        for var_name, var_value in variables.items():
+            rasterize_grid(var_value.T, (xmin, xmax, ymax, ymin), crs=crs_stereo,
+                            to_geotiff=f"{out_path}{var_name}_{frame_index}.tif")
 
 #@profile
 def render_at_date(meshes, path_to_furnsh, epo_utc=None, center='P', crs=None, dem_mask=None, source='SUN',
