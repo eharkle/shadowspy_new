@@ -7,12 +7,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import geopandas as gpd
+
 # from line_profiler_pycharm import profile
 
 RAYTRACING_BACKEND = 'cgal' #'embree' #
 RAYTRACING_BACKEND = RAYTRACING_BACKEND.lower()
 if RAYTRACING_BACKEND == 'cgal':
-    from src.shadowspy.shape import CgalTrimeshShapeModel as MyTrimeshShapeModel
+    from src.shadowspy.shape import CgalTrimeshShapeModel as MyTrimeshShapeModel, get_centroids
 elif RAYTRACING_BACKEND == 'embree':
     try:
         import embree
@@ -32,6 +33,9 @@ from rasterio.enums import Resampling
 
 from src.shadowspy.photometry import mmpf_mh_boyd2017lpsc
 from src.shadowspy.math_util import angle_btw
+from src.shadowspy.flux_util import get_Fsun
+from src.shadowspy.shape import get_centroids as get_cents, get_surface_normals
+from src.mesh_operations.plotting import rasterize_with_raytracing
 
 
 def plot3d(mesh_path, var_to_plot, center='P'):
@@ -76,8 +80,8 @@ def extended_source(sun_vecs, extsource_coord):
 
 #@profile
 def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN', inc_flux=1361., center='P',
-                     point=True, basemesh=None, return_irradiance=False, azi_ele_deg=None, extsource_coord=None,
-                     crs=None):
+                     point=True, scatter=False, basemesh=None, return_irradiance=False, azi_ele_deg=None, extsource_coord=None,
+                     crs=None, ffmat_path=None):
     if center == 'V':
         C = shape_model.V
         N = shape_model.VN
@@ -134,12 +138,18 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN
 
         sourcedir = source_vecs / np.linalg.norm(source_vecs, axis=1)[:, np.newaxis]
 
-
-
     if center == 'P':
         E = shape_model.get_direct_irradiance(inc_flux, sourcedir, basemesh=basemesh)
     elif center == 'V':
         E = shape_model.get_direct_irradiance_at_vertices(inc_flux, sourcedir, basemesh=basemesh)
+
+    if scatter:
+        FF_path = "/panfs/ccds02/nobackup/people/sberton2/habnich/shadowspy_dev/examples/out/DG1/FF_0.05_3.0_1e-2.bin"
+        if azi_ele_deg is not None:
+            utc0 = np.array(['2026 AUG 01 00:00:00.00'])
+        D = sourcedir
+        Qrefl, QIR = irradiance_with_scattered_flux(ffmat_path, D, E)
+        E = E + Qrefl + QIR
 
     if return_irradiance:
         return E
@@ -160,43 +170,43 @@ def get_flux_at_date(shape_model, utc0, path_to_furnsh, albedo1=0.1, source='SUN
     # # compute radiance out of scatterer
     return E * albedo1 * photom1 * np.pi / inc_flux
 
-def irradiance_with_scattered_flux(shape_model, FF_path, t, D, crs_stereo, out_path):
-    from flux.model import ThermalModel
+def irradiance_with_scattered_flux(FF_path, D, E0):
     from flux.compressed_form_factors import CompressedFormFactorMatrix
-    from src.mesh_operations.plotting import rasterize_grid
-    import glob
+    from scipy.constants import Stefan_Boltzmann as sigmaSB
+    from flux.thermal import PccThermalModel1D
+    from flux.model import update_incoming_radiances
 
     # if full FF is passed and scattered flux is requested, then...
-    z = np.linspace(0, 3e-3, 31)
+    z = 0 #np.linspace(0, 3e-3, 31)
     FF = CompressedFormFactorMatrix.from_file(FF_path)
     shape_model = FF.shape_model
 
-    thermal_model = ThermalModel(
-        FF, t, D,
-        F0=1365, rho=0.11, method='1mvp',
-        z=z, T0=100, ti=120, rhoc=9.6e5, emiss=0.95,
-        Fgeotherm=0.2, bcond='Q', shape_model=shape_model)
+    rho=0.11
+    emiss=0.95
+    Fgeotherm = 0.005
+    ti = 120
+    rhoc = 9.6e5
 
-    V = shape_model.V
-    xmin = np.min(V[:, 0])
-    xmax = np.max(V[:, 0])
-    ymin = np.min(V[:, 1])
-    ymax = np.max(V[:, 1])
-    extent = xmin, xmax, ymin, ymax
+    # get the previous fluxes and surface temperature
+    Qrefl_prev = 0
+    QIR_prev = 0
+    Q0 = (1 - rho) * E0 + Fgeotherm
+    T0 = 110
+    Tsurf_prev = (Q0 / (sigmaSB * emiss)) ** 0.25
 
-    for frame_index, (T, E, Qrefl, QIR) in enumerate(thermal_model):
+    emiss = 0 # PccThermalModel1D(z, T0, ti, rhoc, emiss, Fgeotherm, Q0, Tsurf_prev, bcond='Q')
 
-        # Create a dictionary of variables to iterate over (T[:,0] --> analyze/save surface only)
-        variables = {'T': T[:,0], 'E': E, 'Qrefl': Qrefl, 'QIR': QIR}
+    # get the next reflected and infrared fluxes
+    Qrefl, QIR = update_incoming_radiances(
+        FF, E0, rho, emiss, Qrefl=Qrefl_prev,
+        QIR=QIR_prev, Tsurf=Tsurf_prev)
 
-        # Loop through the dictionary
-        for var_name, var_value in variables.items():
-            rasterize_grid(var_value.T, (xmin, xmax, ymax, ymin), crs=crs_stereo,
-                            to_geotiff=f"{out_path}{var_name}_{frame_index}.tif")
+    return Qrefl, QIR
+
 
 #@profile
 def render_at_date(meshes, path_to_furnsh, epo_utc=None, center='P', crs=None, dem_mask=None, source='SUN',
-                   inc_flux=1361, basemesh_path=None, show=False, point=True, azi_ele_deg=None, return_irradiance=False,
+                   inc_flux=1361, basemesh_path=None, show=False, point=True, scatter=False, azi_ele_deg=None, return_irradiance=False,
                    extsource_coord=None, **kwargs):
     """
     Render terrain at epoch
@@ -249,7 +259,20 @@ def render_at_date(meshes, path_to_furnsh, epo_utc=None, center='P', crs=None, d
         V, F, N, P = import_mesh(f"{meshes['cart']}", get_normals=True, get_centroids=True)
         meshes_cropped = meshes
 
-    shape_model = MyTrimeshShapeModel(V, F, N)
+    if scatter and ('ffmat_path' in kwargs) and ('Vst_path' in kwargs):
+        from flux.compressed_form_factors import CompressedFormFactorMatrix
+
+        shape_model = MyTrimeshShapeModel(V.astype(np.float64), F, N)
+        FF_path = kwargs['ffmat_path']
+        FF = CompressedFormFactorMatrix.from_file(FF_path)
+        shape_model = FF.shape_model
+        F = shape_model.F
+        V_st_path = kwargs['Vst_path']
+        V_st = np.load(V_st_path)
+        V_st = np.concatenate([V_st, np.ones((V_st.shape[0], 1))], axis=1)
+        N_st = get_surface_normals(V_st, F)
+        N_st[N_st[:, 2] > 0] *= -1
+        shape_model_st = MyTrimeshShapeModel(V_st, F, N_st)
 
     if basemesh_path != None:
         V_ds, F_ds, N_ds, P_ds = import_mesh(basemesh_path, get_normals=True, get_centroids=True)
@@ -259,50 +282,52 @@ def render_at_date(meshes, path_to_furnsh, epo_utc=None, center='P', crs=None, d
 
     # get flux at observer (would be good to just ask for F/V overlapping with meas image)
     flux_at_obs = get_flux_at_date(shape_model, date_illum_spice, path_to_furnsh=path_to_furnsh, source=source,
-                                   inc_flux=inc_flux, center=center, point=point, basemesh=basemesh,
+                                   inc_flux=inc_flux, center=center, point=point, scatter=scatter, basemesh=basemesh,
                                    return_irradiance=return_irradiance, azi_ele_deg=azi_ele_deg,
-                                   extsource_coord=extsource_coord, crs=crs)
+                                   extsource_coord=extsource_coord, crs=crs, ffmat_path=FF_path)
 
-    if show:
-        # plot3d(mesh_path=f"{meshes['cart']}", var_to_plot=flux_at_obs)
-        plot3d(mesh_path=meshes_cropped['stereo'], var_to_plot=flux_at_obs)
+    if scatter: # maybe just necessary if using unequal grid from python-flux
+        ds = rasterize_with_raytracing({'flux':flux_at_obs}, shape_model_st)
 
-    # rasterize results from mesh
-    # ---------------------------
-    if center == 'V':
-        flux_df = pd.DataFrame(np.vstack([V_st[:, 0].ravel(), V_st[:, 1].ravel(), flux_at_obs]).T,
-                               columns=['x', 'y', 'flux'])
-    elif center == 'P':
-        flux_df = pd.DataFrame(np.vstack([P_st[:, 0].ravel(), P_st[:, 1].ravel(), flux_at_obs]).T,
-                               columns=['x', 'y', 'flux'])
+    else:
+        if show:
+            # plot3d(mesh_path=f"{meshes['cart']}", var_to_plot=flux_at_obs)
+            plot3d(mesh_path=meshes_cropped['stereo'], var_to_plot=flux_at_obs)
 
-    duplicates = flux_df.duplicated(subset=['y', 'x'], keep='first')
-    if len(flux_df[duplicates]) > 0:
-        logging.warning(f"- render_at_date is dropping {len(flux_df[duplicates])/len(flux_df)*100.}% duplicated rows. Check.")
-        print(flux_df[duplicates].sort_values(by=['x', 'y']))
-        flux_df = flux_df[~duplicates]
+        # rasterize results from mesh
+        # ---------------------------
+        if center == 'V':
+            flux_df = pd.DataFrame(np.vstack([V_st[:, 0].ravel(), V_st[:, 1].ravel(), flux_at_obs]).T,
+                                   columns=['x', 'y', 'flux'])
+        elif center == 'P':
+            flux_df = pd.DataFrame(np.vstack([P_st[:, 0].ravel(), P_st[:, 1].ravel(), flux_at_obs]).T,
+                                   columns=['x', 'y', 'flux'])
 
-    flux_df = flux_df.set_index(['y', 'x'], verify_integrity=True)
-    ds = flux_df.to_xarray()
+        duplicates = flux_df.duplicated(subset=['y', 'x'], keep='first')
+        if len(flux_df[duplicates]) > 0:
+            logging.warning(f"- render_at_date is dropping {len(flux_df[duplicates])/len(flux_df)*100.}% duplicated rows. Check.")
+            flux_df = flux_df[~duplicates]
+
+        flux_df = flux_df.set_index(['y', 'x'], verify_integrity=True)
+
+        ds = flux_df.to_xarray()
 
     if crs != None:
         # assign crs
         img_crs = crs
         ds.rio.write_crs(img_crs, inplace=True)
 
-    # ds.flux.plot(robust=True)
-    # plt.show()
-
     # interpolate nans
     ds['x'] = ds.x * 1e3
     ds['y'] = ds.y * 1e3
+
     dsi = ds.interpolate_na(dim="x").interpolate_na(dim="y")
 
     return dsi, date_illum_str
 
 
 def irradiance_at_date(meshes, path_to_furnsh, center='P', crs=None, dem_mask=None, source='SUN',
-                       inc_flux=1361, basemesh_path=None, show=False, point=True, extsource_coord=None,
+                       inc_flux=1361, basemesh_path=None, show=False, point=True, scatter=False, extsource_coord=None,
                        epo_utc=None, azi_ele_deg=None, **kwargs):
     """
     Get terrain irradiance at epoch
@@ -325,11 +350,13 @@ def irradiance_at_date(meshes, path_to_furnsh, center='P', crs=None, dem_mask=No
     #     logging.error("* Either set return_irradiance=True, or else call render_at_date.")
 
     return render_at_date(meshes, path_to_furnsh, epo_utc, center, crs, dem_mask, source, inc_flux, basemesh_path, show,
-                          point, azi_ele_deg=azi_ele_deg, return_irradiance=True, extsource_coord=extsource_coord)
+                          point, scatter, azi_ele_deg=azi_ele_deg, return_irradiance=True, extsource_coord=extsource_coord,
+                          **kwargs)
 
 
 def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
-                       meas_path, outdir=None, center='P', basemesh_path=None, point=True, **kwargs):
+                       meas_path, outdir=None, center='P', basemesh_path=None, point=True, scatter=False,
+                       **kwargs):
     """
     Render input terrain at epoch and match observed flux to input image
     :param pdir:
@@ -370,7 +397,8 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
 
     # get full rendering at date
     dsi, date_illum_str = render_at_date(meshes, path_to_furnsh, epo_utc, center=center, crs=meas.rio.crs,
-                                         dem_mask=meas_outer_poly, basemesh_path=basemesh_path, point=point)
+                                         dem_mask=meas_outer_poly, basemesh_path=basemesh_path, point=point,
+                                         scatter=False)
 
     # interp to measured image coordinates
     rendering = dsi.rio.reproject_match(meas, Resampling=Resampling.bilinear,

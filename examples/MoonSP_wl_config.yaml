@@ -1,13 +1,18 @@
-base_resolution: 2
-max_extension: 40e3
-root: "examples/"
-indir: "examples/aux/"
-#dem_path: f'{indir}{siteid}_GLDELEV_001.tif' # _final_adj_5mpp_surf.tif'  #
-#fartopo_path: ""
-outdir: "examples/out/"
-tmpdir: "examples/tmp/"
-start_time: datetime.datetime(2026, 1, 30, hour=15)
-end_time: datetime.datetime(2025, 9, 21, hour=16)
-time_step_hours: 1
-flux_path: "examples/aux/ref_solar_irradiance_whi-2008_ver2.dat"
+root: "./"
+indir: "./aux/"
+base_resolution: 5
+max_extension: 350e3
+extres: {25e3: 40, 60e3: 80, 100e3: 240, 300e3: 480}
+dem_path: "{{ variables.indir }}{{ siteid }}_final_adj_5mpp_surf.tif"  #
+fartopo_path: "/explore/nobackup/people/mkbarker/GCD/grid/20mpp/v4/public/final/LDEM_80S_40MPP_ADJ.TIF"
+outdir: "./out/uv_spring/" #{{ siteid }}/"
+tmpdir: "./tmp/uv_point_summer/{{ siteid }}/"
+start_time: "2026-08-01 00:00:00.0" # datetime.datetime(2026, 11, 01, hour=0, minute=0, second=0.)
+end_time: "2026-08-29 00:00:00.0" # datetime.datetime(2026, 11, 29, hour=0, minute=0, second=0.)
+time_step_hours: 6
+download_kernels: false
+point_source: false
+extsource_coord: "./aux/coordflux_100pts_outline33_centerlast_R1_F1_stdlimbdark.txt"
+irradiance_only: true
+flux_path: "./aux/ref_solar_irradiance_whi-2008_ver2.dat"
 wavelength: [0, 320]

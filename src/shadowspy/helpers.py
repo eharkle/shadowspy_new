@@ -25,8 +25,21 @@ def process_data_list(data_list, common_args, use_azi_ele, use_image_times, opt)
     dem = xr.open_dataarray(common_args['dem_path'])
 
     for data in tqdm(data_list, total=len(data_list)):
+
         common_args, func_args = prepare_processing(use_azi_ele, use_image_times, data, common_args, opt)
         full_args = {**common_args, **func_args}
+
+        # TODO add an option to skip existing epochs
+        try:
+            epostr = f"{func_args['azi_ele_deg'][0]}_{func_args['azi_ele_deg'][1]}"
+        except:
+            epostr = datetime.datetime.strptime(func_args['epo_in'], '%Y-%m-%d %H:%M:%S.%f')
+            epostr = epostr.strftime('%y%m%d%H%M%S')
+
+        if os.path.exists(f"{opt.outdir}{opt.siteid}/{opt.siteid}_{epostr}.tif"):
+            print(f"- {opt.outdir}{opt.siteid}/{opt.siteid}_{epostr}.tif already processed. Skip.")
+            continue
+        ###
 
         if opt.irradiance_only:
             dsi, date_illum_str = irradiance_at_date(**full_args)
@@ -60,6 +73,11 @@ def prepare_processing(use_azi_ele, use_image_times, data, common_args, opt):
 
     common_args['inc_flux'] = Fsun
 
+    if opt.ffmat_path not in [None, 'None']:
+        common_args['ffmat_path'] = opt.ffmat_path
+    if opt.Vst_path not in [None, 'None']:
+        common_args['Vst_path'] = opt.Vst_path
+
     return common_args, func_args
 
 #@profile
@@ -80,5 +98,11 @@ def dump_processing_results(dsi, dem, func_args, opt):
     dsi = dsi.expand_dims(dim="time")
     dsi = dsi.rio.reproject_match(dem, resampling=Resampling.cubic_spline)
     dsi.flux.rio.to_raster(outpath, compress='zstd')
+
+    # from matplotlib import pyplot as plt
+    # dsi.flux.plot(robust=True)
+    # plt.show()
+    # dsi.flux.plot(vmin=0, vmax=0.1)
+    # plt.show()
 
     return epostr, outpath

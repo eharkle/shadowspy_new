@@ -16,7 +16,7 @@ from src.shadowspy.utilities import run_log
 def main_pipeline(opt):
 
     start_glb = time.time()
-
+    
     # download kernels
     if opt.download_kernels:
         download_kernels()
@@ -40,6 +40,7 @@ def main_pipeline(opt):
         'basemesh_path': outer_mesh_path,
         'path_to_furnsh': f"{opt.indir}simple.furnsh",
         'point': opt.point_source,
+        'scatter': opt.scatter,
         'extsource_coord': opt.extsource_coord,
         'source': opt.source,
         'dem_path': dem_path,
@@ -52,16 +53,11 @@ def main_pipeline(opt):
     if not use_azi_ele:
         dem = xr.open_dataarray(common_args['dem_path'])
         basic_raster_stats(dsi_epo_path_dict, opt.time_step_hours, crs=dem.rio.crs, outdir=opt.outdir, siteid=opt.siteid)
-    else:
-        dsi_epo_path = pd.read_csv(f'{opt.outdir}{opt.siteid}/dsi_epo_paths.csv').set_index('Unnamed: 0').to_dict()['0']
-        # dsi_epo_path = {datetime.strptime(str(k), '%Y%m%d%H%M%S'):v for k,v in dsi_epo_path.items()}
-        dem = xr.open_dataarray(common_args['dem_path'])
-        basic_raster_stats(dsi_epo_path, opt.time_step_hours, crs=dem.rio.crs, outdir=opt.outdir, siteid=opt.siteid)
 
-    # set up logs
-    run_log(Fsun=opt.Fsun, Rb=opt.Rb, base_resolution=opt.base_resolution, siteid=opt.siteid, dem_path=dem_path, outdir=opt.outdir,
-            start_time=opt.start_time, end_time=opt.end_time, time_step_hours=opt.time_step_hours,
-            runtime_sec=round(time.time() - start_glb, 2), logpath=f"{opt.outdir}illum_stats_{opt.siteid}_{int(time.time())}.json")
+        # set up logs
+        run_log(Fsun=opt.Fsun, Rb=opt.Rb, base_resolution=opt.base_resolution, siteid=opt.siteid, dem_path=dem_path, outdir=opt.outdir,
+                start_time=opt.start_time, end_time=opt.end_time, time_step_hours=opt.time_step_hours,
+                runtime_sec=round(time.time() - start_glb, 2), logpath=f"{opt.outdir}illum_stats_{opt.siteid}_{int(time.time())}.json")
 
     logging.info(f"Completed in {round(time.time() - start_glb, 2)} seconds.")
 

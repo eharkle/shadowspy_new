@@ -256,6 +256,8 @@ class TrimeshShapeModel(ShapeModel):
 
         '''
         # Determine which rays escaped (i.e., can see the sun)
+        print("basemesh shape", basemesh)
+
         if basemesh is None:
             I = ~self.is_occluded(np.arange(self.num_faces), Dsun.copy(order='C'))
         else:
