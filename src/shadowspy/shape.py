@@ -41,6 +41,9 @@ def get_surface_normals_and_face_areas(V, F):
     N = C/C_norms[:, np.newaxis]
     A = C_norms/2
 
+    # norms = np.linalg.norm(N, axis=1)
+    # assert np.allclose(norms, 1.0), "Normals are not unit length!"
+
     return N, A
 
 
@@ -256,8 +259,6 @@ class TrimeshShapeModel(ShapeModel):
 
         '''
         # Determine which rays escaped (i.e., can see the sun)
-        print("basemesh shape", basemesh)
-
         if basemesh is None:
             I = ~self.is_occluded(np.arange(self.num_faces), Dsun.copy(order='C'))
         else:

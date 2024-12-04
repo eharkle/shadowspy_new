@@ -7,10 +7,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import geopandas as gpd
+from src.mesh_operations.mesh_utils import remove_degenerate_faces
 
 # from line_profiler_pycharm import profile
 
-RAYTRACING_BACKEND = 'cgal' #'embree' #
+RAYTRACING_BACKEND = 'cgal' # 'embree' #
 RAYTRACING_BACKEND = RAYTRACING_BACKEND.lower()
 if RAYTRACING_BACKEND == 'cgal':
     from src.shadowspy.shape import CgalTrimeshShapeModel as MyTrimeshShapeModel, get_centroids
@@ -244,7 +245,7 @@ def render_at_date(meshes, path_to_furnsh, epo_utc=None, center='P', crs=None, d
         # match image/mask and mesh crs
         dem_mask.to_crs(crs, inplace=True)
 
-        print(f"- Cropping DEM to {dem_mask}")
+        print(f"- Cropping DEM to {dem_mask.values[0]}")
         meshes_cropped = {}
         meshes_path = ('/').join(meshes['stereo'].split('/')[:-1])
         meshes_cropped['stereo'] = f"{meshes_path}/cropped_st.vtk"
@@ -262,7 +263,6 @@ def render_at_date(meshes, path_to_furnsh, epo_utc=None, center='P', crs=None, d
     if scatter and ('ffmat_path' in kwargs) and ('Vst_path' in kwargs):
         from flux.compressed_form_factors import CompressedFormFactorMatrix
 
-        shape_model = MyTrimeshShapeModel(V.astype(np.float64), F, N)
         FF_path = kwargs['ffmat_path']
         FF = CompressedFormFactorMatrix.from_file(FF_path)
         shape_model = FF.shape_model
@@ -273,6 +273,9 @@ def render_at_date(meshes, path_to_furnsh, epo_utc=None, center='P', crs=None, d
         N_st = get_surface_normals(V_st, F)
         N_st[N_st[:, 2] > 0] *= -1
         shape_model_st = MyTrimeshShapeModel(V_st, F, N_st)
+    else:
+        FF_path = None
+        shape_model = MyTrimeshShapeModel(V.astype(np.float64), F, N)
 
     if basemesh_path != None:
         V_ds, F_ds, N_ds, P_ds = import_mesh(basemesh_path, get_normals=True, get_centroids=True)
@@ -436,7 +439,7 @@ def render_match_image(pdir, meshes, path_to_furnsh, img_name, epo_utc,
         
     # save simulated image to raster
     outraster = f"{outdir}{img_name}_{date_illum_str}.tif"
-    rendering.transpose('y', 'x').rio.to_raster(outraster)
+    rendering.transpose('y', 'x').rio.to_raster(outraster, compression='zstd')
 
     print(f"- Flux for {img_name} saved to {outraster} (xy resolution = {rendering.rio.resolution()}mpp). "
           f"Normalized by {exposure_factor}.")

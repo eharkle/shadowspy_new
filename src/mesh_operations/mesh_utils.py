@@ -23,6 +23,13 @@ def filter_faces(vertices_mask, faces):
 
     return filtered_faces
 
+def remove_degenerate_faces(V, F):
+    v1, v2, v3 = V[F[:, 0]], V[F[:, 1]], V[F[:, 2]]
+    areas = np.linalg.norm(np.cross(v2 - v1, v3 - v1), axis=1) / 2
+    valid_faces = areas > 1e-10  # Threshold for zero-area faces
+    print(f"- Removed {len(F)-sum(valid_faces)} degenerate faces. ({len(F)}/{sum(valid_faces)})")
+    return F[valid_faces]
+
 def remove_faces_with_vertices(faces, vertices_to_remove):
     # Convert vertices_to_remove to a set for faster lookup
     vertices_to_remove_set = set(vertices_to_remove)

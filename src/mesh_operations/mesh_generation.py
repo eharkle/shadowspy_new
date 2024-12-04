@@ -7,6 +7,7 @@ import rioxarray as rio
 
 from src.shadowspy.coord_tools import unproject_stereographic, sph2cart
 from src.mesh_operations.mesh_tools import get_uniform_triangle_mesh
+from src.mesh_operations.mesh_utils import remove_degenerate_faces
 
 
 def generate_square_with_hole_vertices(outer_square_size=10, hole_size=2, spacing=1):
@@ -130,6 +131,7 @@ def make(base_resolution, decimation_rates, tif_path, out_path, mesh_ext='.xmf',
                 mesh = meshio.Mesh(V_cart, [('triangle', mesh_versions[decimation]['F'])])
                 # fout = f"in/shackleton_{np.product(mesh_versions[decimation]['shape'])*2}.ply"
                 fout = f"{out_path}b{base_resolution}_dn{decimation}{mesh_ext}"
+
             else:
                 mesh = meshio.Mesh(mesh_versions[decimation]['V'], [('triangle', mesh_versions[decimation]['F'])])
                 # fout = f"in/shackleton_{np.product(mesh_versions[decimation]['shape'])*2}_st.ply"

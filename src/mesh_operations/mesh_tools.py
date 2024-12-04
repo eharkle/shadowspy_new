@@ -2,7 +2,7 @@ import meshio
 import numpy as np
 import logging
 
-from src.mesh_operations.mesh_utils import import_mesh
+from src.mesh_operations.mesh_utils import import_mesh, remove_degenerate_faces
 from src.shadowspy.shape import get_centroids
 
 
@@ -38,6 +38,9 @@ def get_uniform_triangle_mesh(xgrid, ygrid, data, decimation=1):
     V = points_mesh
     z = np.ndarray.flatten(dem)
     V = np.row_stack([V.T, z]).T
+
+    # clean up mesh
+    F = remove_degenerate_faces(V, F)
 
     P = get_centroids(V, F)
 

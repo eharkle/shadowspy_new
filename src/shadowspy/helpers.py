@@ -25,21 +25,18 @@ def process_data_list(data_list, common_args, use_azi_ele, use_image_times, opt)
     dem = xr.open_dataarray(common_args['dem_path'])
 
     for data in tqdm(data_list, total=len(data_list)):
-
         common_args, func_args = prepare_processing(use_azi_ele, use_image_times, data, common_args, opt)
         full_args = {**common_args, **func_args}
 
-        # TODO add an option to skip existing epochs
         try:
             epostr = f"{func_args['azi_ele_deg'][0]}_{func_args['azi_ele_deg'][1]}"
         except:
             epostr = datetime.datetime.strptime(func_args['epo_in'], '%Y-%m-%d %H:%M:%S.%f')
             epostr = epostr.strftime('%y%m%d%H%M%S')
 
-        if os.path.exists(f"{opt.outdir}{opt.siteid}/{opt.siteid}_{epostr}.tif"):
-            print(f"- {opt.outdir}{opt.siteid}/{opt.siteid}_{epostr}.tif already processed. Skip.")
+        if os.path.exists(f"{opt.outdir}{full_args['img_name']}_{epostr}.tif"):
+            print(f"- {opt.outdir}{full_args['img_name']}_{epostr}.tif already processed. Skip.")
             continue
-        ###
 
         if opt.irradiance_only:
             dsi, date_illum_str = irradiance_at_date(**full_args)
@@ -97,7 +94,7 @@ def dump_processing_results(dsi, dem, func_args, opt):
     dsi = dsi.assign_coords(time=func_args['epo_in'])
     dsi = dsi.expand_dims(dim="time")
     dsi = dsi.rio.reproject_match(dem, resampling=Resampling.cubic_spline)
-    dsi.flux.rio.to_raster(outpath, compress='zstd')
+    dsi.flux.rio.to_raster(outpath, compression='zstd')
 
     # from matplotlib import pyplot as plt
     # dsi.flux.plot(robust=True)
